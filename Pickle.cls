@@ -80,7 +80,7 @@ public abstract class Pickle {
     }
     
  
-    public Boolean parseScenario(String scenario) {
+    public Boolean runScenario(String scenario) {
         Boolean lineMatches;
         registerStatementTypes(new StatementType[] { new StatementSetPage(this), new StatementSetValue(this), new StatementClickButton(this), new StatementCheckValue(this) });
         List<String> wordsToIgnore = new String[] { 'given', 'when', 'and', 'then' };
@@ -127,13 +127,15 @@ public abstract class Pickle {
     public Boolean randomTesting(String pageName, Integer nbSteps) {
         if (availableActions == null) throw new PickleException('Must register at least one action using registerAction()');
         if (availableFieldsMap == null) throw new PickleException('Must register at least one field using registerField()');
+
+        System.debug('Launching random testing for ' + pageName);
     
         List<String> availableFields = new List<String>();
         availableFields.addAll(availableFieldsMap.keyset());
     
         initializeController(pageName);
         Integer randomNumber;
-        String fieldName;
+        String fieldName, fieldValue;
         List<Object> possibleValues;
         
         for (Integer nb=0; nb<nbSteps; nb++) {
@@ -142,6 +144,7 @@ public abstract class Pickle {
             // Try an action
             if (randomNumber == 0) {
                 randomNumber = Integer.valueOf(Math.random() * availableActions.size());
+                System.debug('Step #' + nb + ': Executing action "' + availableActions[randomNumber] + '"');
                 executeAction(availableActions[randomNumber]);
             } else
             // Try setting a value
@@ -155,20 +158,22 @@ public abstract class Pickle {
                 // We're going to try one of the possible values
                 if (randomNumber <= 8) {
                     randomNumber = Integer.valueOf(Math.random() * possibleValues.size());
-                    if (possibleValues instanceOf List<SelectOption>) setValue(fieldName, ((SelectOption)(possibleValues[randomNumber])).getValue());
-                    else setValue(fieldName, String.valueOf(possibleValues[randomNumber]));
+                    if (possibleValues instanceOf List<SelectOption>) fieldValue = ((SelectOption)(possibleValues[randomNumber])).getValue();
+                    else fieldValue = String.valueOf(possibleValues[randomNumber]);
                 }
                 // We're going to set an empty field
-                else if (randomNumber == 9) setValue(fieldName, '');
+                else if (randomNumber == 9) fieldValue = '';
                 // We're going to try another value
                 else {
                     if (possibleValues instanceOf List<SelectOption> || possibleValues instanceOf List<String>) {
-                        setValue(fieldName, 'sdfsdfsdf');
+                        fieldValue = 'sdfsdfsdf';
                     }
                     else if (possibleValues instanceOf List<Integer> || possibleValues instanceOf List<Double>) {
-                        setValue(fieldName, String.valueOf(Math.random() * 1000000.0 - 500000.0));
+                        fieldValue = String.valueOf(Math.random() * 1000000.0 - 500000.0);
                     }
                 }
+                System.debug('Step #' + nb + ': Setting field "' + fieldName + '" to "' + fieldValue + '"');
+                setValue(fieldName, fieldValue);
             }
         }
         return true;
