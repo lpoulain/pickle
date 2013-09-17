@@ -21,7 +21,9 @@ You can also extend the language to add your own statement types.
 
 Random testing
 -----
-End users don't always follow the flow of your VisualForce pages. Use random testing to simulate a 5-year old trying to click on just about any button and enter any value in your VisualForce page.
+End users don't always follow the your VisualForce pages flow, so can sometimes get a crash because they did something that made no sense whatsoever. Use random testing to simulate a 5-year old trying to click on just about any button and enter any value in your VisualForce page.
+
+WARNING: because of its inherent nature, it is not recommended to deploy random testing code on production as it might randomly stall code deployment. Random tests can however be manually run on the sandbox.
 
 How does it work?
 -----
@@ -64,3 +66,5 @@ For randon testing, you need to define initializeController(), setValue() and ex
         sp.randomTesting('My VF Page', 1000);
         
 In the above example, randomTesting() will run 1000 steps. Each step is either a executing an action or setting a field. In the latter case, Pickle will randomly choose among the list of available values, but will sometime choose to enter a random value (e.g. a string which is not in the provided list). After all, you should not trust client-side verification ;-)
+
+If the random test fails, you can trace back the steps Pickle followed by looking at the debug log.
