@@ -52,6 +52,7 @@ You can also extend the Pickle syntax by defining a class deriving from Pickle.S
     CustomPickle cp = new CustomPickle();
     // Registers the custom statement type (you can pass a Pickle.StatementType of List<Pickle.StatementType>)
     cp.registerStatementType(new StatementCheckResult(sp));
+    cp.runScenario('Given I am on page "My VF Page"\r\nWhen I set "number" to "5"\r\nand I click on "Compute"\r\nThen the result should be 16');
 
 For randon testing, you need to define initializeController(), setValue() and executeAction(). You also need to register the available actions and fields, as well as the possible values for each field (note: Pickle recognizes List<SelectOption>):
 
