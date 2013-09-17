@@ -1,4 +1,4 @@
-pickle
+Pickle
 ======
 
 Cucumber for Salesforce.com
