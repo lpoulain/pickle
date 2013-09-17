@@ -15,6 +15,7 @@ Use scenarios in plain English to test your VisualForce pages, e.g.
     When I set "My Field" to "Random Value"
     and I click on "Update"
     Then "result" should contain "OK"
+    and "numeric Field" should be >= "5"
 
 You can also extend the language to add your own statement types.
 
