@@ -87,6 +87,8 @@ If the random test fails, you can trace back the steps Pickle followed by lookin
 
 Future enhancements
 -----
-- Add a "startTest" and "endTest" statements
-- Add a statement type to run a SOQL query (ideally in a more English) and check the results
-- Add a statement type to verify the content of a list of SObject
+- "startTest" and "endTest" statements
+- A statement type to verify the content of a list of SObject
+- A statement type to run a SOQL query (ideally in a more English) and check the results
+- A repository of scenarios, allowing end users to see what scenarios are actually being tested by Salesforce
+- Handle the User object in the data loader statement (doesn't create new Users but assigns a temporary ID to them
