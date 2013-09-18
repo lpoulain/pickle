@@ -67,7 +67,7 @@ public class PickleTest {
         // Registers the custom statement type (you can pass a Pickle.StatementType of List<Pickle.StatementType>)
         cp.registerStatementType(new StatementCheckResult(cp));
         // Runs the scenario. An exception is thrown if it fails
-        cp.runScenario('Given I am on page "My VF Page"\r\nWhen I set "number" to "5"\r\nand I set "text" to "foo"\r\nand I set "select" to "22"\r\nand I click on "Compute"\r\nThen "result" should be >= "16"\r\nand the result should be 16');
+        cp.runScenario('Given the following "Account" exist:\r\nAccount Id|Account Name\r\n1|Foo Inc.\r\n\r\nGiven the following "Cases" exist:\r\nCase Id|Account Id|Subject|Case Origin|Escalated\r\n2|1|This is a test|Web|true\r\n\r\nGiven I am on page "My VF Page"\r\nWhen I set "number" to "5"\r\nand I set "text" to "foo"\r\nand I set "select" to "22"\r\nand I click on "Compute"\r\nThen "result" should be >= "16"\r\nand the result should be 16');
  
         // The second part is preparing Pickle for random testing
         // It first registers the available action
