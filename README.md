@@ -11,11 +11,27 @@ Create testing scenarios in plain English
 -------
 Use scenarios in plain English to test your VisualForce pages, e.g.
 
+    Given the following "Accounts" exist:
+    Account Id|Account Name
+    1|Foo Inc.
+     
+    Given the following "Cases" exist:
+    Case Id|Account Id|Subject|Case Origin|Escalated
+    2|1|This is a test|Web|true
+     
     Given I am on page "My VisualForce Page"
     When I set "My Field" to "Random Value"
     and I click on "Update"
     Then "result" should contain "OK"
     and "numeric Field" should be >= "5"
+
+When fed with the above scenario, Pickle does the following:
+- It creates an Account
+- It creates a Case linked to that account (using the ID '1' entered previously)
+- It instanciates the VisualForce controller
+- It sets a field "My Field"
+- It calls the action "Update"
+- It checks some conditions on the "result" and "numeric Field" fields
 
 You can also extend the language to add your own statement types.
 
