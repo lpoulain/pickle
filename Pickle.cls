@@ -1,4 +1,26 @@
-public abstract class Pickle {
+global abstract class Pickle {
+    Map<String, String> stmtId2sfdcId;
+    public void addSObjectId(String stmtId, String sfdcId) {
+        if (stmtId2sfdcId == null) stmtId2sfdcId = new Map<String, String>();
+        if (stmtId2sfdcId.containsKey(stmtId)) throw new PickleException('Id "' + stmtId + '" has already been used');
+        stmtId2sfdcId.put(stmtId, sfdcId);
+    }
+    public String getSObjectId(String stmtId) { if (stmtId2sfdcId == null) stmtId2sfdcId = new Map<String, String>(); return stmtId2sfdcId.get(stmtId); }
+    Map<String, String> label2name;
+    public String objectLabel2name(String l) {
+        if (label2name != null) return label2name.get(l);
+        
+        label2name = new Map<String, String>();
+        Map<String, Schema.SObjectType> gd = Schema.getGlobalDescribe();
+        Schema.DescribeSObjectResult sor;
+
+        for (String s : gd.keySet()) {
+            sor = gd.get(s).getDescribe();
+            label2name.put(sor.getLabel(), s);
+            label2name.put(sor.getLabelPlural(), s);
+        }
+        return label2name.get(l);
+    }
     public class PickleException extends Exception { }
     public virtual void initializeController(String pageName) { throw new PickleException('initializeController() not defined'); }
     public virtual void setValue(String fieldName, String fieldValue) { throw new PickleException('setValue() not defined'); }
@@ -79,14 +101,33 @@ public abstract class Pickle {
         }
     }
     
+    global class statementIterator implements Iterator<String> {
+        List<String> statements;
+        Integer statementNb;
+        
+        public statementIterator(String scenario) {
+           statements = scenario.split('\r\n');
+           statementNb = 0; 
+        }
+        
+        global boolean hasNext() { return (statementNb < statements.size()); }
+        global String next() { return statements[statementNb++]; }
+    }
+    public Boolean hasNextStatement() { return statements.hasNext(); }
+    public String nextStatement() { return statements.next(); }
+    Iterator<String> statements;
  
     public Boolean runScenario(String scenario) {
+        statements = new statementIterator(scenario);
+        
         Boolean lineMatches;
-        registerStatementTypes(new StatementType[] { new StatementSetPage(this), new StatementSetValue(this), new StatementClickButton(this), new StatementCheckValue(this) });
+        registerStatementTypes(new StatementType[] { new StatementSetPage(this), new StatementSetValue(this), new StatementClickButton(this), new StatementCheckValue(this), new PickleStatementDataLoader(this) });
         List<String> wordsToIgnore = new String[] { 'given', 'when', 'and', 'then' };
         
         String statement;
-        for (String line : scenario.split('\r\n')) {
+        
+        List<String> test = new String[] { '234', '234', '234' };
+        for (String line = nextStatement(); hasNextStatement(); line = nextStatement()) {
             statement = line;
             for (String word : wordsToIgnore) {
                 if (line.startsWithIgnoreCase(word)) {
@@ -104,7 +145,7 @@ public abstract class Pickle {
                 }
             }
             if (lineMatches) continue;
-            System.debug(logginglevel.ERROR, 'Unknown statement: ' + statement);
+            throw new PickleException('Unknown statement: ' + statement);
             return false;
         }
         return true;
