@@ -43,7 +43,7 @@ WARNING: because of its inherent nature, it is not recommended to deploy random 
 
 How does it work?
 -----
-First of all, copy Pickle.cls to your Org.
+First of all, copy Pickle.cls and PickleStatementDataLoader.cls to your Org (TestPickle.cls is optional and can just be used as a test/example).
 
 Because Apex is a compiled language, you need to extend that class to bind words such as "My Field" to your own apex methods (use PickleTest as a template). The following virtual functions can be implemented (you don't necessarily need them all, depending on what testing you're doing):
 
