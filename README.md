@@ -84,3 +84,9 @@ For randon testing, you need to define initializeController(), setValue() and ex
 In the above example, randomTesting() will run 1000 steps. Each step is either a executing an action or setting a field. In the latter case, Pickle will randomly choose among the list of available values, but will sometime choose to enter a random value (e.g. a string which is not in the provided list). After all, you should not trust client-side verification ;-)
 
 If the random test fails, you can trace back the steps Pickle followed by looking at the debug log.
+
+Future enhancements
+-----
+- Add a "startTest" and "endTest" statements
+- Add a statement type to run a SOQL query (ideally in a more English) and check the results
+- Add a statement type to verify the content of a list of SObject
