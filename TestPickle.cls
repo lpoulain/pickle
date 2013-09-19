@@ -50,9 +50,9 @@ public class PickleTest {
     }
     
     // This class extends the Pickle syntax by adding a new statement type
-    class StatementCheckResult extends Pickle.StatementType {
+    class StepCheckResult extends Pickle.StepDefinition {
         // This is where you define the regexp
-        public StatementCheckResult (Pickle p) { super(p, 'the result should be (.*)'); }
+        public StepCheckResult (Pickle p) { super(p, 'the result should be (.*)'); }
         // If the regexp is recognized, it will call this method, passing the arguments as a list of strings
         public override Boolean execute(List<String> args) {
             Integer result = ((CustomPickle)myPickle).ctrl.getResult();
@@ -65,11 +65,16 @@ public class PickleTest {
         // Instantiate the Pickle class
         CustomPickle cp = new CustomPickle();
         // Registers the custom statement type (you can pass a Pickle.StatementType of List<Pickle.StatementType>)
-        cp.registerStatementType(new StatementCheckResult(cp));
+        cp.registerStepDefinition(new StepCheckResult(cp));
         // Runs the scenario. An exception is thrown if it fails
-        cp.runScenario('Given the following "Account" exist:\r\nAccount Id|Account Name\r\n1|Foo Inc.\r\n\r\nGiven the following "Cases" exist:\r\nCase Id|Account Id|Subject|Case Origin|Escalated\r\n2|1|This is a test|Web|true\r\n\r\nGiven I am on page "My VF Page"\r\nWhen I set "number" to "5"\r\nand I set "text" to "foo"\r\nand I set "select" to "22"\r\nand I click on "Compute"\r\nThen "result" should be >= "16"\r\nand the result should be 16');
- 
+//        cp.runScenario('Given the following "Account" exist:\r\nAccount Id|Account Name\r\n1|Foo Inc.\r\n\r\nGiven the following "Cases" exist:\r\nCase Id|Account Id|Subject|Case Origin|Escalated\r\n2|1|This is a test|Web|true\r\n\r\nGiven I am on page "My VF Page"\r\nWhen I set "number" to "5"\r\nand I set "text" to "foo"\r\nand I set "select" to "22"\r\nand I click on "Compute"\r\nThen "result" should be >= "16"\r\nand the result should be 16');
+        cp.runScenario('Given the following Users exist:\r\n1|Laurent Poulain\r\n\r\nGiven the following "Cases" exist:\r\nCase Id|Owner Id|Subject|Case Origin|Escalated\r\n2|1|This is a test|Web|true\r\n\r\nGiven I am on page "My VF Page"\r\nWhen I set "number" to "5"\r\nand I set "text" to "foo"\r\nand I set "select" to "22"\r\nand I click on "Compute"\r\nThen "result" should be >= "16"\r\nand the result should be 16');
+
+/*
         // The second part is preparing Pickle for random testing
+        // It should NOT be deployed on a Production org as a test method
+        // Instead, it should be run on the sandbox only
+        
         // It first registers the available action
         cp.registerAction('Compute');
         cp.initializeController('My VF Page');
@@ -79,6 +84,6 @@ public class PickleTest {
         cp.registerField('number', new Integer[] { 1, 2, 3, 4, 5, 6 } );
         cp.registerField('select', cp.ctrl.getSelectFieldOptions());
         // Launches the testing, asking to perform 1000 random steps
-        cp.randomTesting('My VF Page', 1000);
+        cp.randomTesting('My VF Page', 1000);*/
     }
 }
