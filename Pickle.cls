@@ -1,41 +1,40 @@
 global abstract class Pickle {
-    Map<String, String> stmtId2sfdcId;
-    public void addSObjectId(String stmtId, String sfdcId) {
-        if (stmtId2sfdcId == null) stmtId2sfdcId = new Map<String, String>();
-        if (stmtId2sfdcId.containsKey(stmtId)) throw new PickleException('Id "' + stmtId + '" has already been used');
-        stmtId2sfdcId.put(stmtId, sfdcId);
+    // SFDC Object ID management
+    // used by StepDataLoader to manage temporary object IDs and map them to SFDC Ids
+    Map<String, String> scenarioId2sfdcId;
+    public void addSObjectId(String scenarioId, String sfdcId) {
+        if (scenarioId2sfdcId.containsKey(scenarioId)) throw new PickleException('Line ' + getLineNb() + ': Temporary Id "' + scenarioId + '" has already been used');
+        scenarioId2sfdcId.put(scenarioId, sfdcId);
     }
-    public String getSObjectId(String stmtId) { if (stmtId2sfdcId == null) stmtId2sfdcId = new Map<String, String>(); return stmtId2sfdcId.get(stmtId); }
-    Map<String, String> label2name;
-    public String objectLabel2name(String l) {
-        if (label2name != null) return label2name.get(l);
-        
-        label2name = new Map<String, String>();
-        Map<String, Schema.SObjectType> gd = Schema.getGlobalDescribe();
-        Schema.DescribeSObjectResult sor;
-
-        for (String s : gd.keySet()) {
-            sor = gd.get(s).getDescribe();
-            label2name.put(sor.getLabel(), s);
-            label2name.put(sor.getLabelPlural(), s);
-        }
-        return label2name.get(l);
+    public String getSObjectId(String scenarioId) {
+        if (!scenarioId2sfdcId.containsKey(scenarioId)) throw new PickleException('Line ' + getLineNb() + ': Unknown temporary Id "' + scenarioId + '"');
+        return scenarioId2sfdcId.get(scenarioId);
     }
+    
+    public PickleUtil util;
+    
+    public Pickle() {
+        scenarioId2sfdcId = new Map<String, String>();
+        util = new PickleUtil();
+    }
+    
+    // These are the methods that can be defined when creating a new custom step
     public class PickleException extends Exception { }
     public virtual void initializeController(String pageName) { throw new PickleException('initializeController() not defined'); }
     public virtual void setValue(String fieldName, String fieldValue) { throw new PickleException('setValue() not defined'); }
     public virtual Object getValue(String fieldName) { throw new PickleException('getValue() not defined'); }
     public virtual void executeAction(String actionName) { throw new PickleException('executeAction() not defined'); }
 
-    List<StatementType> statementTypes = new List<StatementType>();
-    public void registerStatementType(StatementType stt) { statementTypes.add(stt); }
-    public void registerStatementTypes(List<StatementType> l) { statementTypes.addAll(l); }
+    // Standard steps that come with Pickle
+    List<StepDefinition> stepDefinitions = new List<StepDefinition>();
+    public void registerStepDefinition(StepDefinition st) { stepDefinitions.add(st); }
+    public void registerStepDefinitions(List<StepDefinition> l) { stepDefinitions.addAll(l); }
 
-    public abstract class StatementType {
+    public abstract class StepDefinition {
         Pattern myPattern;
         Matcher myMatcher;
         public Pickle myPickle;
-        public StatementType(Pickle p, String s) { myPickle = p; myPattern = Pattern.compile(s); }
+        public StepDefinition(Pickle p, String s) { myPickle = p; myPattern = Pattern.compile(s); }
         public Boolean matches(String s) { myMatcher = myPattern.matcher(s); return myMatcher.matches(); }
         public Boolean execute() {
             List<String> args = new List<String>();
@@ -45,34 +44,30 @@ global abstract class Pickle {
         public abstract Boolean execute(List<String> args);
     }
     
-    class StatementSetPage extends StatementType {
-        public StatementSetPage (Pickle p) { super(p, 'I am on page "(.*)"'); }
+    class StepSetPage extends StepDefinition {
+        public StepSetPage (Pickle p) { super(p, 'I am on page "(.*)"'); }
         public override Boolean execute(List<String> args) {
-            System.Debug('I AM ON PAGE statement matched ' + args);
             myPickle.initializeController(args[0]);
             return true;
         }
     }
-    class StatementSetValue extends StatementType {
-        public StatementSetValue (Pickle p) { super(p, 'I set "(.*)" to "(.*)"'); }
+    class StepSetValue extends StepDefinition {
+        public StepSetValue (Pickle p) { super(p, 'I set "(.*)" to "(.*)"'); }
         public override Boolean execute(List<String> args) {
-            System.Debug('WHEN I SET statement matched ' + args);
             myPickle.setValue(args[0], args[1]);
             return true;
         }
     }
-    class StatementClickButton extends StatementType {
-        public StatementClickButton (Pickle p) { super(p, 'I click on "(.*)"'); }
+    class StepClickButton extends StepDefinition {
+        public StepClickButton (Pickle p) { super(p, 'I click on "(.*)"'); }
         public override Boolean execute(List<String> args) {
-            System.Debug('AND I CLICK ON statement matched');
             myPickle.executeAction(args[0]);
             return true;
         }
     }
-    class StatementCheckValue extends StatementType {
-        public StatementCheckValue (Pickle p) { super(p, '"(.*)" should (contain|be equal to|be =|be <|be >|be <=|be >=) "(.*)"'); }
+    class StepCheckValue extends StepDefinition {
+        public StepCheckValue (Pickle p) { super(p, '"(.*)" should (contain|be equal to|be =|be <|be >|be <=|be >=) "(.*)"'); }
         public override Boolean execute(List<String> args) {
-            System.Debug('THEN X SHOULD CONTAIN statement matched');
             String fieldName = args[0], theoreticalFieldValue = args[2], comparison = args[1];
             
             Object obj = myPickle.getValue(fieldName);
@@ -101,51 +96,58 @@ global abstract class Pickle {
         }
     }
     
-    global class statementIterator implements Iterator<String> {
-        List<String> statements;
-        Integer statementNb;
+    // Because some scenarios can have to parse multiple lines, we
+    // need to have an iterator accessible through hasNextLine() and nextLine()
+    global class lineIterator {
+        List<String> lines;
+        Integer lineNb;
         
-        public statementIterator(String scenario) {
-           statements = scenario.split('\r\n');
-           statementNb = 0; 
+        public lineIterator(String scenario) {
+           lines = scenario.split('\r\n');
+           lineNb = 0; 
         }
         
-        global boolean hasNext() { return (statementNb < statements.size()); }
-        global String next() { return statements[statementNb++]; }
+        global boolean hasNext() { return (lineNb < lines.size()); }
+        global String next() { return lines[lineNb++]; }
+        global Integer getLineNb() { return lineNb; }
     }
-    public Boolean hasNextStatement() { return statements.hasNext(); }
-    public String nextStatement() { return statements.next(); }
-    Iterator<String> statements;
+    public Boolean hasNextLine() { return lines.hasNext(); }
+    public String nextLine() { return lines.next(); }
+    public Integer getLineNb() { return lines.getlineNb(); }
+    lineIterator lines;
  
+    /////////////////////////////////////////////////   
+    // RUN SCENARIO
+    /////////////////////////////////////////////////   
     public Boolean runScenario(String scenario) {
-        statements = new statementIterator(scenario);
+        lines = new lineIterator(scenario);
         
         Boolean lineMatches;
-        registerStatementTypes(new StatementType[] { new StatementSetPage(this), new StatementSetValue(this), new StatementClickButton(this), new StatementCheckValue(this), new PickleStatementDataLoader(this) });
+        registerStepDefinitions(new StepDefinition[] { new StepSetPage(this), new StepSetValue(this), new StepClickButton(this), new StepCheckValue(this), new PickleStepUserMatch(this), new PickleStepDataLoader(this), new PickleStepSOQL(this) });
         List<String> wordsToIgnore = new String[] { 'given', 'when', 'and', 'then' };
         
-        String statement;
-        
         List<String> test = new String[] { '234', '234', '234' };
-        for (String line = nextStatement(); hasNextStatement(); line = nextStatement()) {
-            statement = line;
+        String line;
+        while (hasNextLine()) {
+            line = nextLine();
             for (String word : wordsToIgnore) {
                 if (line.startsWithIgnoreCase(word)) {
-                    statement = line.substring(word.length());
+                    line = line.substring(word.length());
                     break;
                 }
             }
-            statement = statement.trim();
+            line = line.trim();
             lineMatches = false;
-            for (StatementType stt: statementTypes) {
-                lineMatches = stt.matches(statement);
+            for (StepDefinition sd: stepDefinitions) {
+                lineMatches = sd.matches(line);
                 if (lineMatches) {
-                    if (stt.execute() == false) return false;
+                    System.debug(getLineNb() + ' Step "' + line + '"');
+                    if (sd.execute() == false) throw new PickleException('Step "' + line + '" failed');
                     break;
                 }
             }
             if (lineMatches) continue;
-            throw new PickleException('Unknown statement: ' + statement);
+            throw new PickleException('Unknown step: ' + line);
             return false;
         }
         return true;
