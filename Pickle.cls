@@ -123,7 +123,7 @@ global abstract class Pickle {
         lines = new lineIterator(scenario);
         
         Boolean lineMatches;
-        registerStepDefinitions(new StepDefinition[] { new StepSetPage(this), new StepSetValue(this), new StepClickButton(this), new StepCheckValue(this), new PickleStepUserMatch(this), new PickleStepDataLoader(this), new PickleStepSOQL(this) });
+        registerStepDefinitions(new StepDefinition[] { new StepSetPage(this), new StepSetValue(this), new StepClickButton(this), new StepCheckValue(this), new PickleStepUserMatch(this), new PickleStepDataLoader(this) });
         List<String> wordsToIgnore = new String[] { 'given', 'when', 'and', 'then' };
         
         List<String> test = new String[] { '234', '234', '234' };
