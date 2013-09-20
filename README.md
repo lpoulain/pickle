@@ -77,14 +77,19 @@ You can also extend the Pickle syntax by defining a class deriving from Pickle.S
     class StepCheckResult extends Pickle.StepDefinition {
         // This is where you define the regexp
         public StepCheckResult (Pickle p) { super(p, 'the result should be (.*)'); }
-        // If the regexp is recognized, it will call this method, passing the arguments as a list of strings
+        // If the regexp is recognized, it will call this method,
+        // passing the arguments as a list of strings
         public override Boolean execute(List<String> args) { ... }
     }
         
     CustomPickle cp = new CustomPickle();
-    // Registers the custom step definition (you can pass a Pickle.StepDefinition of List<Pickle.StepDefinition>)
+    // Registers the custom step definition
+    // You can pass a Pickle.StepDefinition of List<Pickle.StepDefinition>)
     cp.registerStepDefinition(new StepCheckResult(sp));
-    cp.runScenario('Given I am on page "My VF Page"\r\nWhen I set "number" to "5"\r\nand I click on "Compute"\r\nThen the result should be 16');
+    cp.runScenario('Given I am on page "My VF Page"\r\n' +
+                   'When I set "number" to "5"\r\n' +
+                   'and I click on "Compute"\r\n' +
+                   'Then the result should be 16');
 
 For randon testing, you need to define initializeController(), setValue() and executeAction(). You also need to register the available actions and fields, as well as the possible values for each field (note: Pickle recognizes List<SelectOption>):
 
