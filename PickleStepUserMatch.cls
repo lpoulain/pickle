@@ -12,10 +12,10 @@ public class PickleStepUserMatch extends Pickle.StepDefinition {
             if (line == '') break;
             
             recordFieldValues = line.split('\\|');
-            if (recordFieldValues.size() != 2) throw new Pickle.PickleException('Line ' + myPickle.getLineNb() + ': the User table should contain only 2 columns (temporary ID and name)');
+            if (recordFieldValues.size() != 2) myPickle.error('The User table should contain only 2 columns (temporary ID and name)');
             
-            usernames.add(recordFieldValues[1]);
-            username2id.put(recordFieldValues[1], recordFieldValues[0]);
+            usernames.add(recordFieldValues[1].trim());
+            username2id.put(recordFieldValues[1].trim(), recordFieldValues[0].trim());
         }
 
         for (User u : [SELECT Id, Name FROM User WHERE Name IN :usernames]) {
@@ -26,7 +26,7 @@ public class PickleStepUserMatch extends Pickle.StepDefinition {
         if (usernames.size() != 0) {
             List<String> tmpList = new List<String>();
             tmpList.addAll(usernames);
-            throw new Pickle.PickleException('The following Users were not found: ' + String.join(tmpList, ', '));
+            myPickle.error('The following Users were not found: ' + String.join(tmpList, ', '));
         }
 
         return true;
