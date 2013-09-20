@@ -33,13 +33,15 @@ Use scenarios in plain English to test your VisualForce pages, e.g.
 
 When fed with the above scenario, Pickle does the following:
 - It associates the User "Joe Smith" with a temporary ID 1
-- It creates an Account with a temporary ID 2
+- It creates an Account and aliases its SFDC Id with a temporary ID 2
 - It creates a Case owned by the User and linked to the Account (using the temporary IDs)
-- It instanciates the VisualForce controller by specifying the class ("MyControllerClass"), passing a parameter. It keeps a reference to the instance under the variable name "My VisualForce Page"
-- It sets a field "My Field"
-- It calls the action "Update"
-- It checks some conditions on the "result", "numeric Field" and "foo" fields
+- It instanciates the VisualForce controller by specifying the class ("MyControllerClass"), passing a parameter. It keeps a reference to the instance under the variable name "My VisualForce Page" which can be called by some custom code
+- It sets a field "My Field" (*)
+- It calls the action "Update" (*)
+- It checks some conditions on the "result", "numeric Field" and "foo" fields 
 - It checks that a SOQL query asking for escalated cases returns only one record whose Case Id is 3 (temporary ID) and subject is "This is a test"
+
+(*) this step involves some custom code that the user must provide
 
 Each scenario is composed of several steps (e.g. When I click on "Update"). You can also extend the language to add your own step definitions.
 
@@ -56,14 +58,18 @@ First of all, copy the *.cls files to your Org (TestPickle.cls is optional and c
 Because Apex is a compiled language, you need to extend that class to bind words such as "My Field" to your own apex methods (use PickleTest as a template). The following virtual functions can be implemented (you don't necessarily need them all, depending on what testing you're doing):
 
     class CustomPickle extends Pickle {    
-        // initializes the custom VF controller
-        public override void initializeController(String pageName)
-        // set the value of a given field
-        public override void setValue(String fieldName, String fieldValue)
-        // get the value of a given field
-        public override Object getValue(String fieldName)
-        // executes a given action
-        public override void executeAction(String actionName)
+        // Initializes the custom VF controller.
+        // This function is not necessary if you provide the controller class
+        public override void initializeController(String pageName) { ... }
+        // Set the value of a given field
+        public override void setValue(String fieldName, String fieldValue) {
+            // retrieves a variable stored by Pickle
+            Object obj = variable.get('My VisualForce Page');
+        }
+        // Get the value of a given field
+        public override Object getValue(String fieldName) { ... }
+        // Executes a given action
+        public override void executeAction(String actionName) { ... }
     }
 
 You can also extend the Pickle syntax by defining a class deriving from Pickle.StepDefinition and registering it:
