@@ -1,3 +1,4 @@
+@isTest
 public class PickleTest {
     // This class is just a fake VisualForce custom controller
     // This controller has a known bug: if any field is not set the result will be null - or may crash
@@ -28,25 +29,25 @@ public class PickleTest {
     // - It defines the bindings between the text (e.g. "") and the calls to the VF Controller
     // - It defines its own Statement type to extend the Pickle syntax
     public class CustomPickle extends Pickle {
-        public MyVisualForceController ctrl;
+//        public MyVisualForceController ctrl;
     
         // These are the standard methods that you can extend to define
         // You don't have to extend them all, but will get an error if Pickle needs
         // a method which hasn't been overriden
-        public override void initializeController(String pageName) { ctrl = new MyVisualForceController(); }
+//        public override void initializeController(String pageName) { ctrl = new MyVisualForceController(); }
         public override void setValue(String fieldName, String fieldValue) {
-            if (fieldName == 'number') { if (fieldValue == '') ctrl.numberField = null; else ctrl.numberField = Integer.valueOf(fieldValue); }
-            else if (fieldName == 'text') ctrl.textField = fieldValue;
-            else if (fieldName == 'select') ctrl.selectField = fieldValue;
+            if (fieldName == 'number') { if (fieldValue == '') ((MyVisualForceController)variables.get('My VF Page')).numberField = null; else ((MyVisualForceController)variables.get('My VF Page')).numberField = Integer.valueOf(fieldValue); }
+            else if (fieldName == 'text') ((MyVisualForceController)variables.get('My VF Page')).textField = fieldValue;
+            else if (fieldName == 'select') ((MyVisualForceController)variables.get('My VF Page')).selectField = fieldValue;
         }
         public override Object getValue(String fieldName) {
-            if (fieldName == 'number') return ctrl.numberField;
-            else if (fieldName == 'text') return ctrl.textField;
-            else if (fieldName == 'select') return ctrl.selectField;
-            else if (fieldName == 'result') return ctrl.getResult();
+            if (fieldName == 'number') return ((MyVisualForceController)variables.get('My VF Page')).numberField;
+            else if (fieldName == 'text') return ((MyVisualForceController)variables.get('My VF Page')).textField;
+            else if (fieldName == 'select') return ((MyVisualForceController)variables.get('My VF Page')).selectField;
+            else if (fieldName == 'result') return ((MyVisualForceController)variables.get('My VF Page')).getResult();
             return null;
         }
-        public override void executeAction(String actionName) { if (actionName == 'Compute') ctrl.compute(); }
+        public override void executeAction(String actionName) { if (actionName == 'Compute') ((MyVisualForceController)variables.get('My VF Page')).compute(); }
     }
     
     // This class extends the Pickle syntax by adding a new statement type
@@ -55,8 +56,8 @@ public class PickleTest {
         public StepCheckResult (Pickle p) { super(p, 'the result should be (.*)'); }
         // If the regexp is recognized, it will call this method, passing the arguments as a list of strings
         public override Boolean execute(List<String> args) {
-            Integer result = ((CustomPickle)myPickle).ctrl.getResult();
-            if (result != Integer.valueOf(args[0])) throw new PickleException('Error: result incorrect');
+            Integer result = ((MyVisualForceController)myPickle.variables.get('My VF Page')).getResult();
+            if (result != Integer.valueOf(args[0])) myPickle.error('Error: result incorrect');
             return true;
         }
     }
@@ -66,13 +67,33 @@ public class PickleTest {
         CustomPickle cp = new CustomPickle();
         // Registers the custom statement type (you can pass a Pickle.StatementType of List<Pickle.StatementType>)
         cp.registerStepDefinition(new StepCheckResult(cp));
-        // Runs the scenario. An exception is thrown if it fails
-//        cp.runScenario('Given the following "Account" exist:\r\nAccount Id|Account Name\r\n1|Foo Inc.\r\n\r\nGiven the following "Cases" exist:\r\nCase Id|Account Id|Subject|Case Origin|Escalated\r\n2|1|This is a test|Web|true\r\n\r\nGiven I am on page "My VF Page"\r\nWhen I set "number" to "5"\r\nand I set "text" to "foo"\r\nand I set "select" to "22"\r\nand I click on "Compute"\r\nThen "result" should be >= "16"\r\nand the result should be 16');
-        cp.runScenario('Given the following Users exist:\r\n1|Laurent Poulain\r\n\r\nGiven the following "Cases" exist:\r\nCase Id|Owner Id|Subject|Case Origin|Escalated\r\n2|1|This is a test|Web|true\r\n\r\nGiven I am on page "My VF Page"\r\nWhen I set "number" to "5"\r\nand I set "text" to "foo"\r\nand I set "select" to "22"\r\nand I click on "Compute"\r\nThen "result" should be >= "16"\r\nand the result should be 16');
 
+        // Runs the scenario. An exception is thrown if it fails
+        cp.runScenario('Given the following Users exist:\r\n' +
+                       '1|Laurent Poulain\r\n' +
+                       '\r\n' +
+                       'Given the following "Account" exist:\r\n' +
+                       'Account Id|Account Name\r\n' +
+                       '2         |Foo Inc.    \r\n' +
+                       '\r\n' +
+                       'Given the following "Cases" exist:\r\n' +
+                       'Case Id|Account Id|Owner Id|Subject       |Case Origin|Escalated\r\n' +
+                       '3      |2         |1       |This is a test|Web        |true     \r\n' +
+                       '\r\n' +
+                       'then the query [SELECT Case Id, Subject FROM Case WHERE "Escalated" = true] should return:\r\n' +
+                       '3|This is a test');
+                       
+        cp.runScenario('Given I am on page "My VF Page" (PickleTest.MyVisualForceController) with parameters foo=24, bar=27\r\n' +
+                       'When I set "number" to "5"\r\n' +
+                       'and I set "text" to "foo"\r\n' +
+                       'and I set "select" to "22"\r\n' +
+                       'and I click on "Compute"\r\n' +
+                       'Then "result" should be >= "16"\r\n' +
+                       'and the result should be 16');
+ 
 /*
         // The second part is preparing Pickle for random testing
-        // It should NOT be deployed on a Production org as a test method
+        // It should NOT be deployed on a Production org as a test method (unless you catch an exception)
         // Instead, it should be run on the sandbox only
         
         // It first registers the available action
@@ -85,5 +106,9 @@ public class PickleTest {
         cp.registerField('select', cp.ctrl.getSelectFieldOptions());
         // Launches the testing, asking to perform 1000 random steps
         cp.randomTesting('My VF Page', 1000);*/
+    }
+    
+    public static testMethod void test() {
+        PickleTest st = new PickleTest();
     }
 }
