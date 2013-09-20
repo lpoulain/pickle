@@ -38,10 +38,10 @@ When fed with the above scenario, Pickle does the following:
 - It instanciates the VisualForce controller by specifying the class ("MyControllerClass"), passing a parameter. It keeps a reference to the instance under the variable name "My VisualForce Page" which can be called by some custom code
 - It sets a field "My Field" (*)
 - It calls the action "Update" (*)
-- It checks some conditions on the "result", "numeric Field" and "foo" fields 
+- It retrieves the values of fields "result", "numeric Field" and "foo" (*) and verifies they meet certain conditions
 - It checks that a SOQL query asking for escalated cases returns only one record whose Case Id is 3 (temporary ID) and subject is "This is a test"
 
-(*) this step involves some custom code that the user must provide
+(*) this step requires that the user provides some custom code
 
 Each scenario is composed of several steps (e.g. When I click on "Update"). You can also extend the language to add your own step definitions.
 
