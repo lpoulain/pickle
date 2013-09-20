@@ -11,27 +11,35 @@ Create testing scenarios in plain English
 -------
 Use scenarios in plain English to test your VisualForce pages, e.g.
 
+    Given the following Users exist:
+    1|Joe Smith
+    
     Given the following "Accounts" exist:
     Account Id|Account Name
-    1|Foo Inc.
+    2         |Foo Inc.
      
     Given the following "Cases" exist:
-    Case Id|Account Id|Subject|Case Origin|Escalated
-    2|1|This is a test|Web|true
+    Case Id|Owner Id|Account Id|Subject       |Case Origin|Escalated
+    3      |1       |2         |This is a test|Web        |true
      
-    Given I am on page "My VisualForce Page"
+    Given I am on page "My VisualForce Page" (MyControllerClass) with parameters foo=24
     When I set "My Field" to "Random Value"
     and I click on "Update"
     Then "result" should contain "OK"
     and "numeric Field" should be >= "5"
+    and "foo" should be equal to "24"
+    and the query [SELECT Case Id, Subject FROM Case WHERE "Escalated" = true] should return:
+    3|This is a test
 
 When fed with the above scenario, Pickle does the following:
-- It creates an Account
-- It creates a Case linked to that account (using the temporary ID '1' entered previously)
-- It instanciates the VisualForce controller
+- It associates the User "Joe Smith" with a temporary ID 1
+- It creates an Account with a temporary ID 2
+- It creates a Case owned by the User and linked to the Account (using the temporary IDs)
+- It instanciates the VisualForce controller by specifying the class ("MyControllerClass"), passing a parameter. It keeps a reference to the instance under the variable name "My VisualForce Page"
 - It sets a field "My Field"
 - It calls the action "Update"
-- It checks some conditions on the "result" and "numeric Field" fields
+- It checks some conditions on the "result", "numeric Field" and "foo" fields
+- It checks that a SOQL query asking for escalated cases returns only one record whose Case Id is 3 (temporary ID) and subject is "This is a test"
 
 Each scenario is composed of several steps (e.g. When I click on "Update"). You can also extend the language to add your own step definitions.
 
@@ -43,7 +51,7 @@ WARNING: because of its inherent nature, it is not recommended to deploy random 
 
 How does it work?
 -----
-First of all, copy Pickle.cls, PickleUtil.cls, PickleStepDataLoader.cls and PickleStepUserMatch.cls to your Org (TestPickle.cls is optional and can just be used as a test/example).
+First of all, copy the *.cls files to your Org (TestPickle.cls is optional and can just be used as a test/example).
 
 Because Apex is a compiled language, you need to extend that class to bind words such as "My Field" to your own apex methods (use PickleTest as a template). The following virtual functions can be implemented (you don't necessarily need them all, depending on what testing you're doing):
 
@@ -89,5 +97,4 @@ Future enhancements
 -----
 - "startTest" and "endTest" steps
 - A step definition type to verify the content of a list of SObject
-- A step definition to run a SOQL query (ideally in a more English) and check the results
 - A repository of scenarios, allowing end users to see what scenarios are actually being part of test methods
