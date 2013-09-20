@@ -1,4 +1,12 @@
 global abstract class Pickle {
+    class PickleException extends Exception { }
+    public void error(String msg) {
+        throw new PickleException('Line ' + getLineNb() + ': ' + msg);
+    }
+
+    // Variables
+    public Map<String, Object> variables;
+
     // SFDC Object ID management
     // used by StepDataLoader to manage temporary object IDs and map them to SFDC Ids
     Map<String, String> scenarioId2sfdcId;
@@ -10,16 +18,18 @@ global abstract class Pickle {
         if (!scenarioId2sfdcId.containsKey(scenarioId)) throw new PickleException('Line ' + getLineNb() + ': Unknown temporary Id "' + scenarioId + '"');
         return scenarioId2sfdcId.get(scenarioId);
     }
-    
+
+    // Helper class    
     public PickleUtil util;
     
     public Pickle() {
+        registerStepDefinitions(new StepDefinition[] { new StepSetPageVar(this), new StepSetPage(this), new StepSetValue(this), new StepClickButton(this), new StepCheckValue(this), new PickleStepUserMatch(this), new PickleStepDataLoader(this), new PickleStepSOQL(this) });
         scenarioId2sfdcId = new Map<String, String>();
-        util = new PickleUtil();
+        util = new PickleUtil(this);
+        variables = new Map<String, Object>();
     }
     
     // These are the methods that can be defined when creating a new custom step
-    public class PickleException extends Exception { }
     public virtual void initializeController(String pageName) { throw new PickleException('initializeController() not defined'); }
     public virtual void setValue(String fieldName, String fieldValue) { throw new PickleException('setValue() not defined'); }
     public virtual Object getValue(String fieldName) { throw new PickleException('getValue() not defined'); }
@@ -42,6 +52,28 @@ global abstract class Pickle {
             return execute(args);
         }
         public abstract Boolean execute(List<String> args);
+    }
+
+    class StepSetPageVar extends StepDefinition {
+        public StepSetPageVar (Pickle p) { super(p, 'I am on page "(.*)" \\((.*)\\)(| with parameters (.*))'); }
+        public override Boolean execute(List<String> args) {
+            Type t = Type.forName(args[1]);
+            if (t == null) myPickle.error('Class "' + args[1] + '" unknown');
+            
+            if (args.size() > 2 && ApexPages.currentPage() != null) {
+                Map<String, String> pageParams = ApexPages.currentPage().getParameters();
+                List<String> paramInfo;
+                for (String param : args[3].split(',')) {
+                    paramInfo = param.split('=');
+                    if (paramInfo.size() < 2) continue;
+                    pageParams.put(paramInfo[0].trim(), paramInfo[1].trim());
+                }
+            }
+            
+            Object obj = t.newInstance();
+            myPickle.variables.put(args[0], obj);
+            return true;
+        }
     }
     
     class StepSetPage extends StepDefinition {
@@ -123,7 +155,6 @@ global abstract class Pickle {
         lines = new lineIterator(scenario);
         
         Boolean lineMatches;
-        registerStepDefinitions(new StepDefinition[] { new StepSetPage(this), new StepSetValue(this), new StepClickButton(this), new StepCheckValue(this), new PickleStepUserMatch(this), new PickleStepDataLoader(this) });
         List<String> wordsToIgnore = new String[] { 'given', 'when', 'and', 'then' };
         
         List<String> test = new String[] { '234', '234', '234' };
