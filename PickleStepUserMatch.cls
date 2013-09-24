@@ -1,5 +1,5 @@
 public class PickleStepUserMatch extends Pickle.StepDefinition {
-    public PickleStepUserMatch(Pickle p) { super(p, 'the following User(s|) exist(s|):'); }
+    public PickleStepUserMatch(Pickle p) { super(p, 'the following User(s|):'); }
     public override Boolean execute(List<String> args) {
         String line;
 
