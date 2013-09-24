@@ -47,3 +47,27 @@ This step calls Test.startTest()
     Stop Test
 
 This step calls Test.stopTest()
+
+Defining Custom Steps
+----
+
+You can also extend the Pickle syntax by defining a class deriving from Pickle.StepDefinition. You need to override the constructor (which defines the step regular expression) and execute(List<String>) which will be called if the step is parsed.
+
+    class StepCheckResult extends Pickle.StepDefinition {
+        // This is where you define the regexp
+        public StepCheckResult (Pickle p) { super(p, 'the result should be (.*)'); }
+        // If the regexp is recognized, it will call this method,
+        // passing the arguments as a list of strings
+        public override Boolean execute(List<String> args) { ... }
+    }
+
+Once the Pickle.StepDefinition is extended, you need to register it by calling Pickle.registerStepDefinition(StepDefinition) or Pickle.registerDefinitions(List<StepDefinition>)
+
+    CustomPickle cp = new CustomPickle();
+    // Registers the custom step definition
+    // You can pass a Pickle.StepDefinition of List<Pickle.StepDefinition>)
+    cp.registerStepDefinition(new StepCheckResult(sp));
+    cp.runScenario('Given I am on page "My VF Page"\r\n' +
+                   'When I set "number" to "5"\r\n' +
+                   'and I click on "Compute"\r\n' +
+                   'Then the result should be 16');
