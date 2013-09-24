@@ -24,8 +24,6 @@
     }
 </script>
 
-{!debug}
-
 <apex:form >
 
 <apex:pageBlock title="Pickle Repository" id="titleBlock">
@@ -43,6 +41,7 @@
     <apex:commandButton value="Refresh" action="{!refresh}"/>
 
     <div id="status"></div>
+{!debug}
 
 </apex:pageBlock>
 
@@ -54,7 +53,7 @@
     <apex:pageBlock title="{!testClass}.cls" id="myBlock">
     
         <apex:pageBlockButtons >
-            <apex:commandButton value="Run the Test" action="{!runTest}" rerender="titleBlock">
+            <apex:commandButton value="Run the Test" action="{!runTest}" rerender="titleBlock, myBlock">
                 <apex:param name="className" value="{!testClass}" assignTo="{!className}" />
             </apex:commandButton>
         </apex:pageBlockButtons>
