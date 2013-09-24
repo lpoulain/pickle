@@ -1,21 +1,28 @@
 global abstract class Pickle {
-    class PickleException extends Exception { }
+    public String scenarioLabel = '';
+    
+    public class PickleException extends Exception { }
     public void error(String msg) {
-        throw new PickleException('Line ' + getLineNb() + ': ' + msg);
+        throw new PickleException('Scenario "' +  scenarioLabel + '", line ' + getLineNb() + ': ' + msg);
     }
 
     // Variables
-    public Map<String, Object> variables;
+    final Map<String, Object> variables;
+    public Object getVariable(String name) {
+        if (!variables.containsKey(name)) error('Variable "' + name + '" does not exist');
+        return variables.get(name);
+    }
+    public Set<String> allVariables() { return variables.keySet(); }
 
     // SFDC Object ID management
     // used by StepDataLoader to manage temporary object IDs and map them to SFDC Ids
     Map<String, String> scenarioId2sfdcId;
     public void addSObjectId(String scenarioId, String sfdcId) {
-        if (scenarioId2sfdcId.containsKey(scenarioId)) throw new PickleException('Line ' + getLineNb() + ': Temporary Id "' + scenarioId + '" has already been used');
+        if (scenarioId2sfdcId.containsKey(scenarioId)) error('Temporary Id "' + scenarioId + '" has already been used');
         scenarioId2sfdcId.put(scenarioId, sfdcId);
     }
     public String getSObjectId(String scenarioId) {
-        if (!scenarioId2sfdcId.containsKey(scenarioId)) throw new PickleException('Line ' + getLineNb() + ': Unknown temporary Id "' + scenarioId + '"');
+        if (!scenarioId2sfdcId.containsKey(scenarioId)) error('Unknown temporary Id "' + scenarioId + '"');
         return scenarioId2sfdcId.get(scenarioId);
     }
 
@@ -23,17 +30,17 @@ global abstract class Pickle {
     public PickleUtil util;
     
     public Pickle() {
-        registerStepDefinitions(new StepDefinition[] { new StepSetPageVar(this), new StepSetPage(this), new StepSetValue(this), new StepClickButton(this), new StepCheckValue(this), new PickleStepUserMatch(this), new PickleStepDataLoader(this), new PickleStepSOQL(this) });
+        registerStepDefinitions(new StepDefinition[] { new StepStartTest(this), new StepStopTest(this), new StepSetPageVar(this), new StepSetPage(this), new StepSetValue(this), new StepClickButton(this), new StepCheckValue(this), new PickleStepUserMatch(this), new PickleStepDataLoader(this), new PickleStepSOQL(this) });
         scenarioId2sfdcId = new Map<String, String>();
         util = new PickleUtil(this);
         variables = new Map<String, Object>();
     }
     
     // These are the methods that can be defined when creating a new custom step
-    public virtual void initializeController(String pageName) { throw new PickleException('initializeController() not defined'); }
-    public virtual void setValue(String fieldName, String fieldValue) { throw new PickleException('setValue() not defined'); }
-    public virtual Object getValue(String fieldName) { throw new PickleException('getValue() not defined'); }
-    public virtual void executeAction(String actionName) { throw new PickleException('executeAction() not defined'); }
+    public virtual void initializeController(String pageName) { error('initializeController() not defined'); }
+    public virtual void setValue(String fieldName, String fieldValue) { error('setValue() not defined'); }
+    public virtual Object getValue(String fieldName) { error('getValue() not defined'); return null; }
+    public virtual void executeAction(String actionName) { error('executeAction() not defined'); }
 
     // Standard steps that come with Pickle
     List<StepDefinition> stepDefinitions = new List<StepDefinition>();
@@ -60,7 +67,7 @@ global abstract class Pickle {
             Type t = Type.forName(args[1]);
             if (t == null) myPickle.error('Class "' + args[1] + '" unknown');
             
-            if (args.size() > 2 && ApexPages.currentPage() != null) {
+            if (args.size() >= 4 && args[2] != null && args[3] != null && ApexPages.currentPage() != null) {
                 Map<String, String> pageParams = ApexPages.currentPage().getParameters();
                 List<String> paramInfo;
                 for (String param : args[3].split(',')) {
@@ -75,7 +82,15 @@ global abstract class Pickle {
             return true;
         }
     }
-    
+
+    class StepStartTest extends StepDefinition {
+        public StepStartTest (Pickle p) { super(p, 'Start Test'); }
+        public override Boolean execute(List<String> args) { Test.startTest(); return true; }
+    }
+    class StepStopTest extends StepDefinition {
+        public StepStopTest (Pickle p) { super(p, 'Stop Test'); }
+        public override Boolean execute(List<String> args) { Test.stopTest(); return true; }
+    }
     class StepSetPage extends StepDefinition {
         public StepSetPage (Pickle p) { super(p, 'I am on page "(.*)"'); }
         public override Boolean execute(List<String> args) {
@@ -98,7 +113,7 @@ global abstract class Pickle {
         }
     }
     class StepCheckValue extends StepDefinition {
-        public StepCheckValue (Pickle p) { super(p, '"(.*)" should (contain|be equal to|be =|be <|be >|be <=|be >=) "(.*)"'); }
+        public StepCheckValue (Pickle p) { super(p, '"(.*)" should (contain|be equal to|be different than|be =|be <>|be <|be >|be <=|be >=) "(.*)"'); }
         public override Boolean execute(List<String> args) {
             String fieldName = args[0], theoreticalFieldValue = args[2], comparison = args[1];
             
@@ -109,7 +124,8 @@ global abstract class Pickle {
                 String fieldValue = (String)obj;
                 if (comparison == 'contain') succeeds = fieldValue.contains(theoreticalFieldValue);
                 else if (comparison == 'be =' || comparison == 'be equal to') succeeds = (fieldValue == theoreticalFieldValue);
-                else throw new PickleException('Comparison operator "' + comparison + '" is incompatible with a string');
+                else if (comparison == 'be <>' || comparison == 'be different than') succeeds = (fieldValue != theoreticalFieldValue);
+                else myPickle.error('Comparison operator "' + comparison + '" is incompatible with a string');
             }
             else if (obj instanceOf Integer || obj instanceOf Double) {
                 Double fieldValue = (Double)obj;
@@ -117,13 +133,14 @@ global abstract class Pickle {
                 else if (comparison == 'be >') succeeds = (fieldValue > Double.valueOf(theoreticalFieldValue));
                 else if (comparison == 'be >=') succeeds = (fieldValue >= Double.valueOf(theoreticalFieldValue));
                 else if (comparison == 'be <') succeeds = (fieldValue < Double.valueOf(theoreticalFieldValue));
+                else if (comparison == 'be <>' || comparison == 'be different than') succeeds = (fieldValue <> Double.valueOf(theoreticalFieldValue));
                 else if (comparison == 'be <=') succeeds = (fieldValue <= Double.valueOf(theoreticalFieldValue));
-                else throw new PickleException('Comparison operator "' + comparison + '" is incompatible with a number');
+                else myPickle.error('Comparison operator "' + comparison + '" is incompatible with a number');
             }
-            else throw new PickleException('Unknown field type');
+            else myPickle.error('Unknown field type');
             
             if (succeeds) return true;
-            throw new PickleException('"' + fieldName + '" ' + comparison + ' "' + theoreticalFieldValue + '" is false (actual value: ' + String.valueOf(obj) + ')');
+            myPickle.error('"' + fieldName + '" ' + comparison + ' "' + theoreticalFieldValue + '" is false (actual value: ' + String.valueOf(obj) + ')');
             return false;
         }
     }
@@ -151,7 +168,8 @@ global abstract class Pickle {
     /////////////////////////////////////////////////   
     // RUN SCENARIO
     /////////////////////////////////////////////////   
-    public Boolean runScenario(String scenario) {
+    public Boolean runScenario(String name, String scenario) {
+        scenarioLabel = name;
         lines = new lineIterator(scenario);
         
         Boolean lineMatches;
@@ -173,14 +191,16 @@ global abstract class Pickle {
                 lineMatches = sd.matches(line);
                 if (lineMatches) {
                     System.debug(getLineNb() + ' Step "' + line + '"');
-                    if (sd.execute() == false) throw new PickleException('Step "' + line + '" failed');
+                    if (sd.execute() == false) error('Step "' + line + '" failed');
                     break;
                 }
             }
             if (lineMatches) continue;
-            throw new PickleException('Unknown step: ' + line);
+            error('Unknown step: ' + line);
             return false;
         }
+
+        if (ApexPages.currentPage() != null) ApexPages.addMessage(new ApexPages.Message(ApexPages.Severity.FATAL, 'my error msg'));
         return true;
     }
  
