@@ -17,7 +17,7 @@ This step will call Pickle abstract method setValue("number", "5"), so you need 
 
     Then "result" should be >= "16"
     
-This step will call Pickle abstract method getValue("result") (which needs to be overriden) and will compare the result with "16". The operations can be "contains" (text value only), =, >=, >, <, <=, <> (numeral value only) or "equal to" (any value)
+This step will call Pickle abstract method getValue("result") (which needs to be overriden) and will compare the result with "16". The operations can be "contain" (text value only), =, >=, >, <, <=, <> (numeral value only) or "equal to" (any value)
 
     Given the following Users:
     1|Joe Smith
