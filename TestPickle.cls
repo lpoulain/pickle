@@ -36,18 +36,18 @@ public class PickleTest {
         // a method which hasn't been overriden
 //        public override void initializeController(String pageName) { ctrl = new MyVisualForceController(); }
         public override void setValue(String fieldName, String fieldValue) {
-            if (fieldName == 'number') { if (fieldValue == '') ((MyVisualForceController)variables.get('My VF Page')).numberField = null; else ((MyVisualForceController)variables.get('My VF Page')).numberField = Integer.valueOf(fieldValue); }
-            else if (fieldName == 'text') ((MyVisualForceController)variables.get('My VF Page')).textField = fieldValue;
-            else if (fieldName == 'select') ((MyVisualForceController)variables.get('My VF Page')).selectField = fieldValue;
+            if (fieldName == 'number') { if (fieldValue == '') ((MyVisualForceController)getVariable('My VF Page')).numberField = null; else ((MyVisualForceController)getVariable('My VF Page')).numberField = Integer.valueOf(fieldValue); }
+            else if (fieldName == 'text') ((MyVisualForceController)getVariable('My VF Page')).textField = fieldValue;
+            else if (fieldName == 'select') ((MyVisualForceController)getVariable('My VF Page')).selectField = fieldValue;
         }
         public override Object getValue(String fieldName) {
-            if (fieldName == 'number') return ((MyVisualForceController)variables.get('My VF Page')).numberField;
-            else if (fieldName == 'text') return ((MyVisualForceController)variables.get('My VF Page')).textField;
-            else if (fieldName == 'select') return ((MyVisualForceController)variables.get('My VF Page')).selectField;
-            else if (fieldName == 'result') return ((MyVisualForceController)variables.get('My VF Page')).getResult();
+            if (fieldName == 'number') return ((MyVisualForceController)getVariable('My VF Page')).numberField;
+            else if (fieldName == 'text') return ((MyVisualForceController)getVariable('My VF Page')).textField;
+            else if (fieldName == 'select') return ((MyVisualForceController)getVariable('My VF Page')).selectField;
+            else if (fieldName == 'result') return ((MyVisualForceController)getVariable('My VF Page')).getResult();
             return null;
         }
-        public override void executeAction(String actionName) { if (actionName == 'Compute') ((MyVisualForceController)variables.get('My VF Page')).compute(); }
+        public override void executeAction(String actionName) { if (actionName == 'Compute') ((MyVisualForceController)getVariable('My VF Page')).compute(); }
     }
     
     // This class extends the Pickle syntax by adding a new statement type
@@ -56,7 +56,7 @@ public class PickleTest {
         public StepCheckResult (Pickle p) { super(p, 'the result should be (.*)'); }
         // If the regexp is recognized, it will call this method, passing the arguments as a list of strings
         public override Boolean execute(List<String> args) {
-            Integer result = ((MyVisualForceController)myPickle.variables.get('My VF Page')).getResult();
+            Integer result = ((MyVisualForceController)myPickle.getVariable('My VF Page')).getResult();
             if (result != Integer.valueOf(args[0])) myPickle.error('Error: result incorrect');
             return true;
         }
@@ -69,27 +69,8 @@ public class PickleTest {
         cp.registerStepDefinition(new StepCheckResult(cp));
 
         // Runs the scenario. An exception is thrown if it fails
-        cp.runScenario('Given the following Users exist:\r\n' +
-                       '1|Laurent Poulain\r\n' +
-                       '\r\n' +
-                       'Given the following "Account" exist:\r\n' +
-                       'Account Id|Account Name\r\n' +
-                       '2         |Foo Inc.    \r\n' +
-                       '\r\n' +
-                       'Given the following "Cases" exist:\r\n' +
-                       'Case Id|Account Id|Owner Id|Subject       |Case Origin|Escalated\r\n' +
-                       '3      |2         |1       |This is a test|Web        |true     \r\n' +
-                       '\r\n' +
-                       'then the query [SELECT Case Id, Subject FROM Case WHERE "Escalated" = true] should return:\r\n' +
-                       '3|This is a test');
-                       
-        cp.runScenario('Given I am on page "My VF Page" (PickleTest.MyVisualForceController) with parameters foo=24, bar=27\r\n' +
-                       'When I set "number" to "5"\r\n' +
-                       'and I set "text" to "foo"\r\n' +
-                       'and I set "select" to "22"\r\n' +
-                       'and I click on "Compute"\r\n' +
-                       'Then "result" should be >= "16"\r\n' +
-                       'and the result should be 16');
+        PickleScenarios.run('My Controller',1,cp);
+        PickleScenarios.run('My Controller',2,cp);
  
 /*
         // The second part is preparing Pickle for random testing
@@ -110,5 +91,33 @@ public class PickleTest {
     
     public static testMethod void test() {
         PickleTest st = new PickleTest();
+    }
+    
+    public static testMethod void testStandardSteps() {
+        CustomPickle cp = new CustomPickle();
+        cp.runScenario('Test', 'I am on page "My VF Page" (PickleTest.MyVisualForceController) with parameters foo=bar');
+        PickleTest.MyVisualForceController ctrl = (PickleTest.MyVisualForceController)cp.getVariable('My VF Page');
+        cp.runScenario('Test', 'When I set "number" to "5"');
+        System.assert(ctrl.numberField == 5);
+        cp.runScenario('Test', 'Then "number" should be = "5"');
+        cp.runScenario('Test', 'and I set "text" to "foo"\r\n' +
+                               'and I set "select" to "22"\r\n' +
+                               'and I click on "Compute"');
+        System.assert(ctrl.result == 16);
+        cp.runScenario('Test', 'Given the following Users:\r\n' +
+                               '1|Laurent Poulain\r\n' +
+                               '\r\n');
+        System.assert(cp.getSObjectId('1') != null);
+        cp.runScenario('Test', 'Given the following Accounts exist:\r\n' +
+                               'Account Id|Owner Id|Account Name\r\n' +
+                               '2         |1       |Foo Inc.    \r\n' +
+                               '\r\n');
+        Account a = [SELECT Id, OwnerId, Name FROM Account];
+        System.assert(a.Id == cp.getSObjectId('2'));
+        System.assert(a.OwnerId == cp.getSObjectId('1'));
+        System.assert(a.Name == 'Foo Inc.');
+        cp.runScenario('Test', 'then the query [SELECT Account Id, Owner Id, Account Name FROM Account WHERE "Account Name" = \'Foo Inc.\'] should return:\r\n' +
+                               '2|1|Foo Inc.');
+        cp.runScenario('Test', 'Start Test\r\nStop Test');
     }
 }
