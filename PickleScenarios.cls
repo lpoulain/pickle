@@ -6,7 +6,7 @@ global class PickleScenarios {
     public List<Scenario> allScenarios { get; private set; }
     public Map<String, Map<String, List<Scenario>>> scenarios { get; private set; }
     Map<String, List<Scenario>> testclass2scenarios;
-    
+    public String className { get; set; }    
     public static Integer scenarioNb;
 
     public static List<Scenario> createScenarios() {
@@ -166,7 +166,7 @@ global class PickleScenarios {
 
     // Running the test    
     public PageReference runTest() {
-        String testClassName = 'PickleTest';
+        String testClassName = className;
         Id testClassId = [SELECT Id FROM ApexClass WHERE Name = :testClassName LIMIT 1].Id;
         ApexTestQueueItem[] queueItems = new ApexTestQueueItem[] { new ApexTestQueueItem(ApexClassId=testClassId) };
         insert queueItems;
@@ -206,11 +206,12 @@ global class PickleScenarios {
         debug = '';
         Integer i, j, lineNb, lineErr;
         String label, msg;
+        Boolean pass = true;
         
         ApexTestResult[] results = 
            [SELECT Outcome, ApexClass.Name, MethodName, Message, StackTrace 
             FROM ApexTestResult 
-            WHERE AsyncApexJobId=:testJobId];
+            WHERE AsyncApexJobId=:testJobId ORDER BY Outcome DESC];
         for (ApexTestResult atr : results) {
             if (atr.message != null && atr.message.startsWith('Pickle.PickleException: ')) {
                 i = atr.message.indexOf('"');
@@ -237,11 +238,13 @@ global class PickleScenarios {
                     lineNb++;
                 }
                 sc.htmlbody = newBody;
-                
+                pass = false;
             }
             else if (atr.outcome == 'Pass') {
-                for (Scenario sc : testclass2scenarios.get(atr.ApexClass.Name)) {
-                    sc.htmlbody = '<span style="color:limegreen;">' + sc.body + '</span>';
+                if (pass) {
+                    for (Scenario sc : testclass2scenarios.get(atr.ApexClass.Name)) {
+                        sc.htmlbody = '<span style="color:limegreen;">' + sc.body + '</span>';
+                    }
                 }
             }
             else debug = atr.outcome + ' ' + atr.message;
