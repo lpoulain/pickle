@@ -23,7 +23,7 @@ public class PickleStepDataLoader extends Pickle.StepDefinition {
         public override Object convert(String s) { return Datetime.valueOf(s); }
     }
 
-    public PickleStepDataLoader(Pickle p) { super(p, 'the following "(.*)" exist:'); }
+    public PickleStepDataLoader(Pickle p) { super(p, 'the following (.*) exist:'); }
     public override Boolean execute(List<String> args) {
         String line;
         String objectName = myPickle.util.getSObjectName(args[0]);
