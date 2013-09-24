@@ -32,13 +32,13 @@ This step will look for the Users whose full names are "Joe Smith" and "Jane Doe
     4         |2       |Bar Corp.
       
     
-This step will create two Account records with the properties defined in the table. The Owners are set to the Users previously defined.
+This step will create two Account records with the properties defined in the table. The Owners are set to the Users previously defined. This step needs to be ended by a blank line to signal the end of the Account table. Note that you can use the singular or plural form to mention the object (e.g. Account or Accounts)
 
     then the query [SELECT Case Id, Subject FROM Case WHERE "Escalated" = true] should return:
     3|This is a test
       
 
-This step runs the SOQL query [SELECT Id, Subject FROM Case WHERE isEscalated = true] and compares the result with the table described after.
+This step runs the SOQL query [SELECT Id, Subject FROM Case WHERE isEscalated = true] and compares the result with the table described in the subsequent lines (whose end is delimited by an empty string)
 
     Start Test
 
