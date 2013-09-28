@@ -53,7 +53,7 @@ public class PickleStepDataLoader extends Pickle.StepDefinition {
         
         while (myPickle.hasNextLine()) {
             line = myPickle.nextLine();
-            if (line == '') return true;
+            if (line == '') break;
 
             obj = soi.instanciate();
             objects.add(obj);
@@ -68,11 +68,11 @@ public class PickleStepDataLoader extends Pickle.StepDefinition {
                 }
             }
 
-            System.debug(objects);
-            System.debug(tempIds);
-            insert objects;
-            for (i=0; i<objects.size(); i++) myPickle.addSObjectId(tempIds[i], objects[i].Id);
+//            System.debug('######## ' + objects);
+//            System.debug(tempIds);
         }
+        insert objects;
+        for (i=0; i<objects.size(); i++) myPickle.addSObjectId(tempIds[i], objects[i].Id);
         return true;
     }
 }
