@@ -30,7 +30,7 @@ global abstract class Pickle {
     public PickleUtil util;
     
     public Pickle() {
-        registerStepDefinitions(new StepDefinition[] { new StepStartTest(this), new StepStopTest(this), new StepSetPageVar(this), new StepSetPage(this), new StepSetValue(this), new StepClickButton(this), new StepCheckValue(this), new PickleStepUserMatch(this), new PickleStepDataLoader(this), new PickleStepSOQL(this) });
+        registerStepDefinitions(new StepDefinition[] { new StepStartTest(this), new StepStopTest(this), new StepSetPageVar(this), new StepSetPage(this), new StepSetValue(this), new StepClickButton(this), new StepCheckValue(this), new PickleStepUserMatch(this), new PickleStepDataLoader(this), new PickleStepSOQL(this), new StepCheckTable(this) });
         scenarioId2sfdcId = new Map<String, String>();
         util = new PickleUtil(this);
         variables = new Map<String, Object>();
@@ -142,6 +142,86 @@ global abstract class Pickle {
             if (succeeds) return true;
             myPickle.error('"' + fieldName + '" ' + comparison + ' "' + theoreticalFieldValue + '" is false (actual value: ' + String.valueOf(obj) + ')');
             return false;
+        }
+    }
+    class StepCheckTable extends StepDefinition {
+        public StepCheckTable (Pickle p) { super(p, '"(.*)" should be:'); }
+        public override Boolean execute(List<String> args) {
+            Object obj = myPickle.getValue(args[0]);
+            String tmpString, line;
+            
+            if (!(obj instanceOf List<List<String>>) && !(obj instanceOf List<SObject>)) myPickle.error('"' + args[0] + '" should be a list of either SObjects or List<String>');
+        
+            // Check the string table
+            if (obj instanceOf List<List<String>>) {
+                List<List<String>> stringTable = (List<List<String>>)obj;
+                List<String> refRow;
+                Integer rowNb = 1;
+
+                for (List<String> row : stringTable) {
+                    if (!myPickle.hasNextLine()) myPickle.error('String table "' + args[0] + '" has more rows than what is expected');
+                    line = myPickle.nextLine();
+                    if (line == '') myPickle.error('String table "' + args[0] + '" has more rows than what is expected');
+                    refRow = line.split('\\|');
+                    
+                    if (refRow.size() != row.size()) myPickle.error('String table "' + args[0] + '", row #' + String.valueOf(rowNb) + ' has an incorrect number of cells (' + String.valueOf(row.size()) + ' vs. ' + String.valueOf(refRow.size()) + ')');
+                    for (Integer colNb=0; colNb<row.size(); colNb++) {
+                        if (refRow[colNb].trim() != row[colNb]) myPickle.error('String table "' + args[0] + '", row #' + String.valueOf(rowNb) + ', col #' + String.valueOf(colNb + 1) + ' has an incorrect value of cells (' + row[colNb] + ' vs. ' + refRow[colNb] + ')');
+                    }
+                    rowNb++;
+                }
+                if (!myPickle.hasNextLine()) return true;
+                line = myPickle.nextLine();
+                if (line != '') myPickle.error('String table "' + args[0] + '" has less rows than what is expected');
+
+            // Check the value of a List<SObject>                
+            } else {
+                if (!myPickle.hasNextLine()) myPickle.error('empty table');
+                line = myPickle.nextLine();
+                if (line == '') myPickle.error('empty table');
+                        
+                List<SObject> sobjs = ((List<SObject>)obj);
+                if (sobjs.size() == 0) {
+                    if (!myPickle.hasNextLine()) return true;
+                    line = myPickle.nextLine();
+                    if (!myPickle.hasNextLine()) return true;
+                    line = myPickle.nextLine();
+                    if (line != '') myPickle.error('Field "' + args[0] + '" is an empty list');
+                }
+
+                SObjectType t = sobjs[0].getSObjectType();
+                Schema.DescribeSObjectResult sor = t.getDescribe();
+                PickleUtil.SObjectInfo soi = myPickle.util.getSObjectInfo(sor.getLabel());
+                
+                List<String> fieldNames = new List<String>();
+                List<String> fieldLabels = line.split('\\|');
+                List<String> recordFieldValues;
+                Object fieldValue;
+
+                for (String label : fieldLabels) {
+                    tmpString = soi.getFieldName(label.toLowercase().trim());
+                    fieldNames.add(tmpString);
+                }
+                List<PickleUtil.FieldConversion> fieldConversion = soi.getConversionList(fieldNames);
+                
+                for (SObject sobj : sobjs) {
+                    if (!myPickle.hasNextLine()) myPickle.error('Variable "' + args[0] + '" returns more rows than what is expected');
+                    line = myPickle.nextLine();
+                    if (line == '') myPickle.error('Variable "' + args[0] + '" returns more rows than what is expected');
+                
+                    recordFieldValues = line.split('\\|');
+                    System.debug(fieldConversion);
+                    for (Integer i=0; i<fieldNames.size(); i++) {
+                        fieldValue = fieldConversion[i].convert(recordFieldValues[i].trim());
+                        if (fieldValue != sobj.get(fieldNames[i])) myPickle.error('Field "' + fieldLabels[i] + '"\'s value "' + sobj.get(fieldNames[i]) + '" different than the expected "' + fieldValue + '"');
+                    }
+                }
+                if (!myPickle.hasNextLine()) return true;
+                line = myPickle.nextLine();
+                if (line != '') myPickle.error('Variable "' + args[0] + '" returns less rows than what is expected');
+            }
+
+            return true;
         }
     }
     
