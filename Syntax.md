@@ -17,7 +17,19 @@ This step will call Pickle abstract method setValue("number", "5"), so you need 
 
     Then "result" should be >= "16"
     
-This step will call Pickle abstract method getValue("result") (which needs to be overriden) and will compare the result with "16". The operations can be "contain" (text value only), =, >=, >, <, <=, <> (numeral value only) or "=", "<>", "equal to", "different than" (any value)
+    Then "String table result" should be:
+    Row 1|Field 1 |Field 2 |Field 3 
+    Row 2|Field 1a|Field 2a|Field 3
+    
+    Then "SObject list result" should be:
+    Case Id|Subject |Case Origin|Escalated
+    1      |Test #1 |Web        |true     
+    3      |Test #2 |Web        |false    
+    2      |Test #3 |Phone      |false
+    
+This step will call Pickle abstract method getValue("result") (which needs to be overriden) and will compare the result with "16". The operations can be "contain" (text value only), =, >=, >, <, <=, <> (numeral value only) or "=", "<>", "equal to", "different than" (any value).
+
+Note that the variable can also be of type List<List<String>> (second example) or List<SObject> (third example).
 
     Given the following Users:
     1|Joe Smith
