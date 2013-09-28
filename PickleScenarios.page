@@ -45,7 +45,7 @@
 
 </apex:pageBlock>
 
-<apex:actionFunction name="refresh" action="{!refresh}" rerender="myBlock"/>
+<apex:actionFunction name="refresh" action="{!checkTestStatus}" rerender="myBlock"/>
 
 <apex:pageBlock id="hiddenBlock" rendered="false"></apex:pageBlock>
 
