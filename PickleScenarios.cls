@@ -34,7 +34,26 @@ global class PickleScenarios {
                          'and I click on "Compute"\r\n' +
                          'Then "result" should be >= "16"\r\n' +
                          'and the result should be 16\r\n' +
-                         'Stop Test')
+                         'Stop Test'),
+            new Scenario('My Other Controller', 1, 'Testing the tables', 'PickleTest',
+                         'Given the following Cases exist:\r\n' +
+                         'Subject |Case Origin|Escalated|Case Id\r\n' +
+                         'Test #1 |Web        |true     |1\r\n' +
+                         'Test #3 |Phone      |false    |2\r\n' +
+                         'Test #2 |Web        |false    |3\r\n' +
+                         '\r\n' +
+                         'Given I am on page "My VF Page" (PickleTest.MyVisualForceController)\r\n' +
+                         'Then "cases" should be:\r\n' +
+                         'Case Id|Subject |Case Origin|Escalated\r\n' +
+                         '1      |Test #1 |Web        |true     \r\n' +
+                         '3      |Test #2 |Web        |false    \r\n' +
+                         '2      |Test #3 |Phone      |false'),
+            new Scenario('My Other Controller', 2, 'Testing the string table', 'PickleTest',
+                         'Given I am on page "My VF Page" (PickleTest.MyVisualForceController)\r\n' +
+                         'Then "String Table" should be:\r\n' +
+                         'Row 1|Field 1 |Field 2 |Field 3 \r\n' +
+                         'Row 2|Field 1a|Field 2a|Field 3a\r\n' +
+                         'Row 3|Field 1b|Field 2b|Field 3b')
         };
     }
     
@@ -89,13 +108,10 @@ global class PickleScenarios {
     }
     
     // INSTANCE METHODS
-    public PickleScenarios() {
-        component = 'My Controller';
-        testJobId = '';
+    private void createScenarioList() {
         allScenarios = PickleScenarios.createScenarios();
 
         listComponents = new List<SelectOption>();
-        component = '';
         scenarios = new Map<String, Map<String, List<Scenario>>>();
         Map<String, List<Scenario>> allTestClasses;
         List<Scenario> l;
@@ -150,7 +166,12 @@ global class PickleScenarios {
                 if (!sc.testCovered) sc.htmlBody = '<span style="color:lightgrey">' + sc.body + '</span>';
             }
         }
-        
+    }
+    
+    public PickleScenarios() {
+        testJobId = '';
+        component = '';
+        createScenarioList();
         if (listComponents.size() >= 1) component = listComponents[0].getValue();
         else component = '';
     }
@@ -201,8 +222,13 @@ global class PickleScenarios {
         
         return '';
     } 
-    
+ 
     public PageReference refresh() {
+        createScenarioList();
+        return null;
+    }
+    
+    public PageReference checkTestStatus() {
         debug = '';
         Integer i, j, lineNb, lineErr;
         String label, msg;
