@@ -279,4 +279,8 @@ global class PickleScenarios {
        
         return null;
     }
+<<<<<<< HEAD
 }
+=======
+}
+>>>>>>> 569eb8ded94fb3d41f9e34ef263e0ca2f8585c04

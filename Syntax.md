@@ -82,4 +82,8 @@ Once the Pickle.StepDefinition is extended, you need to register it by calling P
     cp.runScenario('Given I am on page "My VF Page"\r\n' +
                    'When I set "number" to "5"\r\n' +
                    'and I click on "Compute"\r\n' +
+<<<<<<< HEAD
                    'Then the result should be 16');
+=======
+                   'Then the result should be 16');
+>>>>>>> 569eb8ded94fb3d41f9e34ef263e0ca2f8585c04

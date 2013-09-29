@@ -82,4 +82,8 @@ If the random test fails, you can trace back the steps Pickle followed by lookin
 Future enhancements
 -----
 - A step definition type to verify the content of a list of SObject
+<<<<<<< HEAD
 - Verification of the Apex Messages
+=======
+- Verification of the Apex Messages
+>>>>>>> 569eb8ded94fb3d41f9e34ef263e0ca2f8585c04
