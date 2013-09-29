@@ -1,0 +1,72 @@
+<apex:page controller="PickleScenarios">
+
+<script type="text/javascript">
+    var jobInterval;
+    Visualforce.remoting.timeout = 120000; // Set timeout at page level
+
+    function getJobStatusInt(jobId) {
+        // This remoting call will use the page's timeout value
+        Visualforce.remoting.Manager.invokeAction(
+            '{!$RemoteAction.PickleScenarios.getTestStatus}',
+            jobId,
+            handleResult
+        );
+    }
+
+    function handleResult(result, event) {
+        var elt = document.getElementById('status');
+        elt.innerHTML = result;
+        if (result.indexOf('Completed') >= 0) {
+            clearInterval(jobInterval);
+            refresh();
+        }
+        return false;
+    }
+</script>
+
+<apex:form >
+
+<apex:pageBlock title="Pickle Repository" id="titleBlock">
+
+<script type="text/javascript">
+    function getJobStatus() { getJobStatusInt('{!testJobId}'); }
+
+    if ('{!testJobId}' != '') jobInterval = setInterval(getJobStatus, 1000);
+</script>
+
+    <apex:selectList value="{!component}" size="1">
+        <apex:selectOptions value="{!listComponents}"/>
+    </apex:selectList>
+
+    <apex:commandButton value="Refresh" action="{!refresh}"/>
+
+    <div id="status"></div>
+{!debug}
+
+</apex:pageBlock>
+
+<apex:actionFunction name="refresh" action="{!checkTestStatus}" rerender="myBlock"/>
+
+<apex:pageBlock id="hiddenBlock" rendered="false"></apex:pageBlock>
+
+<apex:repeat value="{!scenarios[component]}" var="testClass">
+    <apex:pageBlock title="{!testClass}.cls" id="myBlock">
+    
+        <apex:pageBlockButtons >
+            <apex:commandButton value="Run the Test" action="{!runTest}" rerender="titleBlock, myBlock">
+                <apex:param name="className" value="{!testClass}" assignTo="{!className}" />
+            </apex:commandButton>
+        </apex:pageBlockButtons>
+        <apex:repeat value="{!scenarios[component][testClass]}" var="sc">
+            <b>{!sc.label}</b>
+            <pre>
+                <apex:outputText escape="false" value="{!sc.htmlBody}"/>
+            </pre>
+        </apex:repeat>
+    </apex:pageBlock>
+    <hr/>
+</apex:repeat>
+
+</apex:form>
+
+</apex:page>
