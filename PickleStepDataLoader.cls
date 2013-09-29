@@ -75,8 +75,4 @@ public class PickleStepDataLoader extends Pickle.StepDefinition {
         for (i=0; i<objects.size(); i++) myPickle.addSObjectId(tempIds[i], objects[i].Id);
         return true;
     }
-<<<<<<< HEAD
 }
-=======
-}
->>>>>>> 569eb8ded94fb3d41f9e34ef263e0ca2f8585c04

@@ -135,8 +135,4 @@ public class PickleTest {
         cp.runScenario('Test', 'Start Test\r\nStop Test');
     }
 */
-<<<<<<< HEAD
 }
-=======
-}
->>>>>>> 569eb8ded94fb3d41f9e34ef263e0ca2f8585c04
