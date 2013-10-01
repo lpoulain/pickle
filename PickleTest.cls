@@ -77,6 +77,19 @@ public class PickleTest {
         cp.registerStepDefinition(new StepCheckResult(cp));
 
         // Runs the scenario. An exception is thrown if it fails
+        
+        // You have two ways to run a scenario.
+        // The first is to run one directly:
+/*        
+        cp.runScenario('Test #1', 'Given I am on page "My VF Page" (PickleTest.MyVisualForceController)\r\n' +
+                                  'When I set "number" to "5"\r\n' +
+                                  'and I set "text" to "foo"\r\n' +
+                                  'and I set "select" to "23"\r\n' +
+                                  'and I click on "Compute"\r\n' +
+                                  'Then "result" should be >= "16"\r\n' +
+                                  'and the result should be 16');*/
+
+        // The other one is to run a scenarion from the scenario Repository:
         PickleScenarios.run('My Controller',1,cp);
         PickleScenarios.run('My Controller',2,cp);
  
@@ -97,10 +110,10 @@ public class PickleTest {
         cp.randomTesting('My VF Page', 1000);*/
     }
     
- /*   public static testMethod void test1() {
+   public static testMethod void test1() {
         PickleTest st = new PickleTest();
     }
-*/
+
     public static testMethod void test2() {
         CustomPickle cp = new CustomPickle();
         PickleScenarios.run('My Other Controller',1,cp);

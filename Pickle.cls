@@ -1,4 +1,17 @@
 global abstract class Pickle {
+    ///////////////////////////////////////////////////
+    // METHODS THAN CAN BE OVERRIDEN WHEN CREATING A NEW CUSTOM PICKLE
+    ///////////////////////////////////////////////////
+    
+    // These are the methods that can be defined when creating a new custom step
+    public virtual void initializeController(String pageName) { error('initializeController() not defined'); }
+    public virtual void setValue(String fieldName, String fieldValue) { error('setValue() not defined'); }
+    public virtual Object getValue(String fieldName) { error('getValue() not defined'); return null; }
+    public virtual void executeAction(String actionName) { error('executeAction() not defined'); }
+
+    ///////////////////////////////////////////////////////
+    // INTERNAL STRUCTURES
+    //////////////////////////////////////////////////////
     public String scenarioLabel = '';
     
     public class PickleException extends Exception { }
@@ -17,32 +30,177 @@ global abstract class Pickle {
     // SFDC Object ID management
     // used by StepDataLoader to manage temporary object IDs and map them to SFDC Ids
     Map<String, String> scenarioId2sfdcId;
+    Map<String, String> sfdcId2scenarioId;
     public void addSObjectId(String scenarioId, String sfdcId) {
         if (scenarioId2sfdcId.containsKey(scenarioId)) error('Temporary Id "' + scenarioId + '" has already been used');
         scenarioId2sfdcId.put(scenarioId, sfdcId);
+        sfdcId2scenarioId.put(sfdcId, scenarioId);
     }
     public String getSObjectId(String scenarioId) {
         if (!scenarioId2sfdcId.containsKey(scenarioId)) error('Unknown temporary Id "' + scenarioId + '"');
         return scenarioId2sfdcId.get(scenarioId);
     }
+    public String getScenarioId(String sfdcId) {
+        return sfdcId2scenarioId.get(sfdcId);
+    }
 
     // Helper class    
-    public PickleUtil util;
+//    public PickleUtil util;
     
     public Pickle() {
-        registerStepDefinitions(new StepDefinition[] { new StepStartTest(this), new StepStopTest(this), new StepSetPageVar(this), new StepSetPage(this), new StepSetValue(this), new StepClickButton(this), new StepCheckValue(this), new PickleStepUserMatch(this), new PickleStepDataLoader(this), new PickleStepSOQL(this), new StepCheckTable(this) });
+        registerStepDefinitions(new StepDefinition[] { new StepStartTest(this), new StepStopTest(this), new StepSetPageVar(this), new StepSetPage(this), new StepSetValue(this), new StepClickButton(this), new StepCheckValue(this), new StepUserMatch(this), new StepDataLoader(this), new StepSOQL(this), new StepCheckTable(this) });
         scenarioId2sfdcId = new Map<String, String>();
-        util = new PickleUtil(this);
+        sfdcId2scenarioId = new Map<String, String>();
+//        util = new PickleUtil(this);
+        SObjectMap = new Map<String, SObjectInfo>();
         variables = new Map<String, Object>();
     }
     
-    // These are the methods that can be defined when creating a new custom step
-    public virtual void initializeController(String pageName) { error('initializeController() not defined'); }
-    public virtual void setValue(String fieldName, String fieldValue) { error('setValue() not defined'); }
-    public virtual Object getValue(String fieldName) { error('getValue() not defined'); return null; }
-    public virtual void executeAction(String actionName) { error('executeAction() not defined'); }
+    ////////////////////////////////////////////
+    // Helper methods
+    ////////////////////////////////////////////
+    
+    // Returns the SObject name given its label (singluar or plural)    
+    Map<String, String> sobjectLabel2name;
+    public String getSObjectName(String label) {
+        if (sobjectLabel2name != null) return sobjectLabel2name.get(label);
+        
+        sobjectLabel2name = new Map<String, String>();
+        Map<String, Schema.SObjectType> gd = Schema.getGlobalDescribe();
+        Schema.DescribeSObjectResult sor;
 
-    // Standard steps that come with Pickle
+        for (String s : gd.keySet()) {
+            sor = gd.get(s).getDescribe();
+            sobjectLabel2name.put(sor.getLabel(), s);
+            sobjectLabel2name.put(sor.getLabelPlural(), s);
+        }
+        return sobjectLabel2name.get(label);
+    }
+    
+    // SObject metadata field information
+    Map<String, SObjectInfo> SObjectMap;
+    public SObjectInfo getSObjectInfo(String objectName) {
+        if (!SObjectMap.containsKey(objectName)) {
+            SObjectInfo soi = new SObjectInfo(objectName, this);
+            SObjectMap.put(objectName, soi);
+            return soi;
+        }
+        return SObjectMap.get(objectName);
+    }
+    
+    public class SObjectInfo {
+        String objectName;
+        Pickle myPickle;
+        Map<String, Schema.SObjectField> objectFields;
+        Map<String, String> fieldLabel2name;
+        Map<String, DisplayType> fieldName2type;
+        Schema.SObjectType objectType;
+        
+        public SObjectInfo(String name, Pickle p) {
+            DisplayType dt;
+            objectName = name;
+            myPickle = p;
+        
+            objectType = Schema.getGlobalDescribe().get(objectName);
+            Schema.DescribeSObjectResult F = objectType.getDescribe();
+            objectFields = F.fields.getMap();
+            fieldLabel2name = new Map<String, String>();
+            fieldName2type = new Map<String, DisplayType>();
+            
+            for (SObjectField sof : objectFields.values()) {
+                Schema.DescribeFieldResult dfr = sof.getDescribe();
+                fieldLabel2name.put(dfr.getLabel().toLowerCase(), dfr.getName());
+                fieldName2type.put(dfr.getName().toLowerCase(), dfr.getType());
+            }
+        }
+
+        public Set<String> getFieldLabels() { return fieldLabel2name.keySet(); }
+
+        public SObject instanciate() { return objectType.newSObject(); }
+        
+        public String getFieldName(String fieldLabel) {
+            if (!fieldLabel2name.containsKey(fieldLabel)) myPickle.error('Unknown field "' + fieldLabel + '" for object "' + objectName + '"');
+            return fieldLabel2name.get(fieldLabel);
+        }
+        
+        public DisplayType getFieldType(String fieldName) {
+            if (!fieldname2type.containsKey(fieldName)) myPickle.error('Unknown field "' + fieldName + '" for object "' + objectName + '"');
+            return fieldname2type.get(fieldName);
+        }
+        
+        public List<FieldConversion> getConversionList(List<String> fieldNames) {
+            List<FieldConversion> res = new List<FieldConversion>();
+            DisplayType dt;
+            
+            for (String fieldName : fieldNames) {
+                dt = fieldName2type.get(fieldName.toLowerCase());
+                if (dt == DisplayType.Reference || dt == DisplayType.Id) res.add(new FieldConversionId(myPickle));
+                else if (dt == DisplayType.String || dt == DisplayType.picklist || dt == DisplayType.textarea) res.add(new FieldConversionString());
+                else if (dt == DisplayType.Currency || dt == DisplayType.Double || dt == DisplayType.Percent || dt == DisplayType.Integer) res.add(new FieldConversionNumber());
+                else if (dt == DisplayType.Boolean) res.add(new FieldConversionBoolean());
+                else if (dt == DisplayType.Date) res.add(new FieldConversionDate());
+                else if (dt == DisplayType.Datetime) res.add(new FieldConversionDatetime());            
+                else myPickle.error('Unsupported type "' + String.valueOf(dt) + '" for field "' + fieldName + '" for object "' + objectName + '"');
+            }
+            
+            return res;
+        }
+    }
+
+    public String dumpListSObject(List<SObject> objs, List<String> fieldNames) {
+        String result = '', line, cell, theId;
+        for (SObject obj : objs) {
+            line = '';
+            for (String fieldName : fieldNames) {
+                cell = String.valueOf(obj.get(fieldName));
+                theId = getScenarioId(cell);
+                if (theId != null) line += '|' + theId;
+                else line += '|' + cell;
+            }
+            if (line != '') line = line.substring(1);
+            result += '   ' + line + '\r\n';
+        }
+        return result;
+    }
+
+    public String dumpStringTable(List<List<String>> stringTable) {
+        String result = '', line;
+        for (List<String> row : stringTable) {
+            line = '';
+            for (String cell : row) line += '|' + cell;
+            if (line != '') line = line.substring(1);
+            result += '   ' + line + '\r\n';
+        }
+        return result;
+    }
+ 
+    public abstract class FieldConversion {
+        public abstract Object convert(String s);
+    }
+    class FieldConversionId extends FieldConversion {
+        Pickle myPickle;
+        FieldConversionId(Pickle p) { myPickle = p; }
+        public override Object convert(String s) { return myPickle.getSObjectId(s); }
+    }
+    class FieldConversionString extends FieldConversion {
+        public override Object convert(String s) { return s; }
+    }
+    class FieldConversionNumber extends FieldConversion {
+        public override Object convert(String s) { return Double.valueOf(s); }
+    }
+    class FieldConversionBoolean extends FieldConversion {
+        public override Object convert(String s) { return (s == 'true'); }
+    }
+    class FieldConversionDate extends FieldConversion {
+        public override Object convert(String s) { return Date.valueOf(s); }
+    }
+    class FieldConversionDatetime extends FieldConversion {
+        public override Object convert(String s) { return Datetime.valueOf(s); }
+    }
+
+    ///////////////////////////////////////////////
+    // STANDARD STEPS THAT COME WITH PICKLE
+    ////////////////////////////////////////////////
     List<StepDefinition> stepDefinitions = new List<StepDefinition>();
     public void registerStepDefinition(StepDefinition st) { stepDefinitions.add(st); }
     public void registerStepDefinitions(List<StepDefinition> l) { stepDefinitions.addAll(l); }
@@ -149,7 +307,8 @@ global abstract class Pickle {
         public override Boolean execute(List<String> args) {
             Object obj = myPickle.getValue(args[0]);
             String tmpString, line;
-            
+
+            if (obj == null) myPickle.error('"' + args[0] + '" is null');
             if (!(obj instanceOf List<List<String>>) && !(obj instanceOf List<SObject>)) myPickle.error('"' + args[0] + '" should be a list of either SObjects or List<String>');
         
             // Check the string table
@@ -159,20 +318,20 @@ global abstract class Pickle {
                 Integer rowNb = 1;
 
                 for (List<String> row : stringTable) {
-                    if (!myPickle.hasNextLine()) myPickle.error('String table "' + args[0] + '" has more rows than what is expected');
+                    if (!myPickle.hasNextLine()) myPickle.error('\r\n\r\nString table "' + args[0] + '" has more rows than what is expected. Actual table returned:\r\n' + myPickle.dumpStringTable(stringTable) + '\r\n');
                     line = myPickle.nextLine();
                     if (line == '') myPickle.error('String table "' + args[0] + '" has more rows than what is expected');
                     refRow = line.split('\\|');
                     
-                    if (refRow.size() != row.size()) myPickle.error('String table "' + args[0] + '", row #' + String.valueOf(rowNb) + ' has an incorrect number of cells (' + String.valueOf(row.size()) + ' vs. ' + String.valueOf(refRow.size()) + ')');
+                    if (refRow.size() != row.size()) myPickle.error('\r\n\r\nString table "' + args[0] + '", row #' + String.valueOf(rowNb) + ' has an incorrect number of cells (' + String.valueOf(row.size()) + ' vs. ' + String.valueOf(refRow.size()) + '). Actual table returned:\r\n' + myPickle.dumpStringTable(stringTable) + '\r\n\r\n');
                     for (Integer colNb=0; colNb<row.size(); colNb++) {
-                        if (refRow[colNb].trim() != row[colNb]) myPickle.error('String table "' + args[0] + '", row #' + String.valueOf(rowNb) + ', col #' + String.valueOf(colNb + 1) + ' has an incorrect value of cells (' + row[colNb] + ' vs. ' + refRow[colNb] + ')');
+                        if (refRow[colNb].trim() != row[colNb]) myPickle.error('\r\n\r\nString table "' + args[0] + '", row #' + String.valueOf(rowNb) + ', col #' + String.valueOf(colNb + 1) + ' has an incorrect value in a cell (' + row[colNb] + ' vs. ' + refRow[colNb] + '). Actual table returned:\r\n' + myPickle.dumpStringTable(stringTable));
                     }
                     rowNb++;
                 }
                 if (!myPickle.hasNextLine()) return true;
                 line = myPickle.nextLine();
-                if (line != '') myPickle.error('String table "' + args[0] + '" has less rows than what is expected');
+                if (line != '') myPickle.error('\r\n\r\nString table "' + args[0] + '" has less rows than what is expected');
 
             // Check the value of a List<SObject>                
             } else {
@@ -191,7 +350,7 @@ global abstract class Pickle {
 
                 SObjectType t = sobjs[0].getSObjectType();
                 Schema.DescribeSObjectResult sor = t.getDescribe();
-                PickleUtil.SObjectInfo soi = myPickle.util.getSObjectInfo(sor.getLabel());
+                SObjectInfo soi = myPickle.getSObjectInfo(sor.getLabel());
                 
                 List<String> fieldNames = new List<String>();
                 List<String> fieldLabels = line.split('\\|');
@@ -202,18 +361,18 @@ global abstract class Pickle {
                     tmpString = soi.getFieldName(label.toLowercase().trim());
                     fieldNames.add(tmpString);
                 }
-                List<PickleUtil.FieldConversion> fieldConversion = soi.getConversionList(fieldNames);
+                List<FieldConversion> fieldConversion = soi.getConversionList(fieldNames);
                 
                 for (SObject sobj : sobjs) {
-                    if (!myPickle.hasNextLine()) myPickle.error('Variable "' + args[0] + '" returns more rows than what is expected');
+                    if (!myPickle.hasNextLine()) myPickle.error('\r\n\r\nVariable "' + args[0] + '" returns more rows than what is expected. Actual list returned:\r\n' + myPickle.dumpListSObject(sobjs, fieldNames));
                     line = myPickle.nextLine();
-                    if (line == '') myPickle.error('Variable "' + args[0] + '" returns more rows than what is expected');
+                    if (line == '') myPickle.error('\r\n\r\nVariable "' + args[0] + '" returns more rows than what is expected. Actual list returned:\r\n' + myPickle.dumpListSObject(sobjs, fieldNames));
                 
                     recordFieldValues = line.split('\\|');
                     System.debug(fieldConversion);
                     for (Integer i=0; i<fieldNames.size(); i++) {
                         fieldValue = fieldConversion[i].convert(recordFieldValues[i].trim());
-                        if (fieldValue != sobj.get(fieldNames[i])) myPickle.error('Field "' + fieldLabels[i] + '"\'s value "' + sobj.get(fieldNames[i]) + '" different than the expected "' + fieldValue + '"');
+                        if (fieldValue != sobj.get(fieldNames[i])) myPickle.error('\r\n\r\nField "' + fieldLabels[i] + '"\'s value "' + sobj.get(fieldNames[i]) + '" different than the expected "' + fieldValue + '". Actual list returned:\r\n' + myPickle.dumpListSObject(sobjs, fieldNames));
                     }
                 }
                 if (!myPickle.hasNextLine()) return true;
@@ -224,9 +383,175 @@ global abstract class Pickle {
             return true;
         }
     }
+
+    class StepSOQL extends Pickle.StepDefinition {
+        public StepSOQL(Pickle p) { super(p, 'the query \\[SELECT (.*) FROM (.*) WHERE (.*)\\] should return:'); }
+        public override Boolean execute(List<String> args) {
+            System.debug('Step SOQL (SELECT: [' + args[0] + '], FROM: [' + args[1] + '], WHERE: [' + args[2] + '])');
+            
+            String objectName = myPickle.getSObjectName(args[1]);
+            if (objectName == null) myPickle.error('Object "' + args[0] + '" unknown');
+            
+            SObjectInfo soi = myPickle.getSObjectInfo(objectName);
     
+            String soqlSelect = '';
+            String soqlFrom = objectName;
+            String soqlWhere = args[2];
+            String tmpString, fieldLabel, line;
+    
+            System.debug(soi.getFieldLabels());
+                    
+            Integer idx = 0, idx2;
+            tmpString = '';
+            while (idx >= 0) {
+                idx2 = soqlWhere.indexOf('"', idx);
+                if (idx2 < 0) {
+                    tmpString += soqlWhere.substring(idx);
+                    break;
+                }
+                idx = idx2;
+                idx2 = soqlWhere.indexOf('"', idx + 1);
+                if (idx2 < 0) {
+                    tmpString += soqlWhere.substring(idx);
+                    break;
+                }
+                fieldLabel = soqlWhere.substring(idx + 1, idx2);
+                tmpString += soi.getFieldName(fieldLabel.toLowerCase());
+                idx = idx2 + 1;
+            }
+            soqlWhere = tmpString;
+    
+            List<String> fieldNames = new List<String>();
+            List<String> fieldLabels = args[0].split(',');
+            List<String> recordFieldValues;
+            Object fieldValue;
+    
+            for (String label : fieldLabels) {
+                tmpString = soi.getFieldName(label.toLowercase().trim());
+                soqlSelect += ', ' + tmpString;
+                fieldNames.add(tmpString);
+            }
+            List<FieldConversion> fieldConversion = soi.getConversionList(fieldNames);
+            soqlSelect = soqlSelect.substring(1);
+            
+            System.debug('SELECT ' + soqlSelect + ' FROM ' + soqlFrom + ' WHERE ' + soqlWhere);
+            
+            List<SObject> sobjs = Database.query('SELECT ' + soqlSelect + ' FROM ' + soqlFrom + ' WHERE ' + soqlWhere);
+            for (SObject obj : sobjs) {
+                if (!myPickle.hasNextLine()) myPickle.error('The SOQL query returns more rows than what is expected. Actual result returned:\r\n' + myPickle.dumpListSObject(sobjs, fieldNames));
+                line = myPickle.nextLine();
+                if (line == '') myPickle.error('The SOQL query returns more rows than what is expected. Actual result returned:\r\n' + myPickle.dumpListSObject(sobjs, fieldNames));
+            
+                recordFieldValues = line.split('\\|');
+                System.debug(fieldConversion);
+                for (Integer i=0; i<fieldNames.size(); i++) {
+                    fieldValue = fieldConversion[i].convert(recordFieldValues[i].trim());
+                    if (fieldValue != obj.get(fieldNames[i])) myPickle.error('Field "' + fieldLabels[i] + '" value "' + obj.get(fieldNames[i]) + '" different than the expected "' + fieldValue + '". Actual result returned:\r\n' + myPickle.dumpListSObject(sobjs, fieldNames));
+                }
+            }
+            
+            if (!myPickle.hasNextLine()) return true;
+            line = myPickle.nextLine();
+            if (line != '') myPickle.error('The SOQL query returns less rows than what is expected');
+            
+            return true;
+        }
+    }
+    
+    class StepDataLoader extends Pickle.StepDefinition {
+        public StepDataLoader(Pickle p) { super(p, 'the following (.*) exist:'); }
+        public override Boolean execute(List<String> args) {
+            String line;
+            String objectName = myPickle.getSObjectName(args[0]);
+            if (objectName == null) myPickle.error('Object "' + args[0] + '" unknown');
+    
+            if (!myPickle.hasNextLine()) return true;
+            line = myPickle.nextLine();
+            if (line == '') return true;
+            Integer i;
+            
+            SObjectInfo soi = myPickle.getSObjectInfo(objectName);
+    
+            List<String> fieldNames = new List<String>();
+            String tmpString;
+    
+            for (String s : line.split('\\|')) {
+                tmpString = soi.getFieldName(s.trim().toLowerCase());
+                fieldNames.add(tmpString);
+            }
+    
+            sObject obj;
+            String fieldName;
+            List<String> recordFieldValues;
+            List<FieldConversion> recordFieldConversion = soi.getConversionList(fieldNames);
+            List<String> tempIds = new List<String>();
+            List<SObject> objects = new List<SObject>();
+            
+            while (myPickle.hasNextLine()) {
+                line = myPickle.nextLine();
+                if (line == '') break;
+    
+                obj = soi.instanciate();
+                objects.add(obj);
+                recordFieldValues = line.split('\\|');
+                for (i=0; i<fieldNames.size(); i++) {
+                    if (i >= recordFieldValues.size()) myPickle.error('Not enough columns for object "' + args[0] + '" at line ' + myPickle.getLineNb() + ' (' + line + ')');
+                    if (soi.getFieldType(fieldNames[i].toLowerCase()) == DisplayType.ID) {
+                        tempIds.add(recordFieldValues[i].trim());
+                    } else {
+    //                    System.debug(recordFieldNames[i].toLowerCase());
+                        obj.put(fieldNames[i].toLowerCase(), recordFieldConversion[i].convert(recordFieldValues[i].trim()));
+                    }
+                }
+    
+    //            System.debug('######## ' + objects);
+    //            System.debug(tempIds);
+            }
+            insert objects;
+            for (i=0; i<objects.size(); i++) myPickle.addSObjectId(tempIds[i], objects[i].Id);
+            return true;
+        }
+    }    
+
+    public class StepUserMatch extends Pickle.StepDefinition {
+        public StepUserMatch(Pickle p) { super(p, 'the following User(s|):'); }
+        public override Boolean execute(List<String> args) {
+            String line;
+    
+            List<String> recordFieldValues;
+            Map<String, String> username2id = new Map<String, String>();
+            Set<String> usernames = new Set<String>();
+    
+            while (myPickle.hasNextLine()) {
+                line = myPickle.nextLine();
+                if (line == '') break;
+                
+                recordFieldValues = line.split('\\|');
+                if (recordFieldValues.size() != 2) myPickle.error('The User table should contain only 2 columns (temporary ID and name)');
+                
+                usernames.add(recordFieldValues[1].trim());
+                username2id.put(recordFieldValues[1].trim(), recordFieldValues[0].trim());
+            }
+    
+            for (User u : [SELECT Id, Name FROM User WHERE Name IN :usernames]) {
+                myPickle.addSObjectId(username2id.get(u.Name), u.Id);
+                usernames.remove(u.Name);
+            }
+    
+            if (usernames.size() != 0) {
+                List<String> tmpList = new List<String>();
+                tmpList.addAll(usernames);
+                myPickle.error('The following Users were not found: ' + String.join(tmpList, ', '));
+            }
+    
+            return true;
+        }
+    }        
+
+    /////////////////////////////////////////////////////////////    
     // Because some scenarios can have to parse multiple lines, we
     // need to have an iterator accessible through hasNextLine() and nextLine()
+    /////////////////////////////////////////////////////////////
     global class lineIterator {
         List<String> lines;
         Integer lineNb;

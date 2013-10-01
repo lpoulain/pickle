@@ -15,16 +15,19 @@ global class PickleScenarios {
                          'Given the following Users:\r\n' +
                          '1|Laurent Poulain\r\n' +
                          '\r\n' +
-                         'Given the following Account exist:\r\n' +
+                         'Given the following Accounts exist:\r\n' +
                          'Account Id|Account Name\r\n' +
                          '2         |Foo Inc.    \r\n' +
+                         '3         |Bar Corp.   \r\n' +
                          '\r\n' +
                          'Given the following Cases exist:\r\n' +
-                         'Case Id|Account Id|Owner Id|Subject       |Case Origin|Escalated\r\n' +
-                         '3      |2         |1       |This is a test|Web        |true     \r\n' +
+                         'Case Id|Account Id|Owner Id|Subject             |Case Origin|Escalated\r\n' +
+                         '4      |2         |1       |This is a test      |Web        |true     \r\n' +
+                         '5      |3         |1       |This is another test|Web        |true     \r\n' +
                          '\r\n' +
                          'then the query [SELECT Case Id, Subject FROM Case WHERE "Escalated" = true] should return:\r\n' +
-                         '3|This is a test'),
+                         '4|This is a test\r\n' +
+                         '5|This is another test'),
             new Scenario('My Controller', 2, 'Testing VF Page', 'PickleTest',
                          'Start Test\r\n' +
                          'Given I am on page "My VF Page" (PickleTest.MyVisualForceController)\r\n' +

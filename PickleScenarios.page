@@ -1,4 +1,4 @@
-<apex:page controller="PickleScenarios">
+<apex:page controller="PickleScenarios" title="Picke Scenarios">
 
 <script type="text/javascript">
     var jobInterval;
