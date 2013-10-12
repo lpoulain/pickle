@@ -8,15 +8,20 @@ global abstract class Pickle {
     public virtual void setValue(String fieldName, String fieldValue) { error('setValue() not defined'); }
     public virtual Object getValue(String fieldName) { error('getValue() not defined'); return null; }
     public virtual void executeAction(String actionName) { error('executeAction() not defined'); }
+    public virtual String getName() { error('getName() not defined'); return null; }
+    public virtual List<Scenario> getScenarios() { return new List<Scenario>(); }
+    public virtual List<Alias> getAliases() { return new List<Alias>(); }
 
     ///////////////////////////////////////////////////////
     // INTERNAL STRUCTURES
     //////////////////////////////////////////////////////
     public String scenarioLabel = '';
+    Integer scenarioNb;
     
     public class PickleException extends Exception { }
     public void error(String msg) {
-        throw new PickleException('Scenario "' +  scenarioLabel + '", line ' + getLineNb() + ': ' + msg);
+        String finalMsg;
+        throw new PickleException(getPosition() + ': ' + msg);
     }
 
     // Variables
@@ -54,6 +59,8 @@ global abstract class Pickle {
 //        util = new PickleUtil(this);
         SObjectMap = new Map<String, SObjectInfo>();
         variables = new Map<String, Object>();
+        aliases = getAliases();
+        for (Integer i=0; i<aliases.size(); i++) aliases[i].nb = i;
     }
     
     ////////////////////////////////////////////
@@ -555,27 +562,89 @@ global abstract class Pickle {
     global class lineIterator {
         List<String> lines;
         Integer lineNb;
+        List<Alias> aliases;
+        List<String> currentAliasLines;
+        Integer aliasLineNb;
+        Integer aliasNb;
         
-        public lineIterator(String scenario) {
+        public lineIterator(String scenario, List<Alias> a) {
            lines = scenario.split('\r\n');
-           lineNb = 0; 
+           aliases = a;
+           aliasNb = null;
+           currentAliasLines = new List<String>();
+           lineNb = 0;
         }
         
-        global boolean hasNext() { return (lineNb < lines.size()); }
-        global String next() { return lines[lineNb++]; }
+        global boolean hasNext() { return (currentAliasLines.size() > 0 || lineNb < lines.size()); }
+        global String next() {
+            List<String> wordsToIgnore = new String[] { 'given', 'when', 'and', 'then' };
+            String line;
+            if (currentAliasLines.size() > 0) {
+                line = currentAliasLines[0];
+                currentAliasLines.remove(0);
+                if (currentAliasLines.size() == 0) aliasNb = null;
+                aliasLineNb++;
+                return line;
+            }
+            line = lines[lineNb++];
+            for (String word : wordsToIgnore) {
+                if (line.startsWithIgnoreCase(word)) {
+                    line = line.substring(word.length());
+                    break;
+                }
+            }
+            line = line.trim();
+             for (Alias a : aliases) {
+                if (line.trim() == a.pattern.trim()) {
+                    currentAliasLines = a.expandsTo.split('\r\n');
+                    if (a.expandsTo.endsWith('\r\n')) currentAliasLines.add('');
+                    aliasLineNb = 0;
+                    aliasNb = a.nb;
+                    return next();
+                }
+            }
+            return line;
+        }
+        
         global Integer getLineNb() { return lineNb; }
+        global Integer getAliasNb() { return aliasNb; }
+        global Integer getAliasLineNb() { return aliasLineNb; }
     }
     public Boolean hasNextLine() { return lines.hasNext(); }
     public String nextLine() { return lines.next(); }
     public Integer getLineNb() { return lines.getlineNb(); }
+    public Integer getAliasLineNb() { return lines.getAliasLineNb(); }
+    public Integer getAliasNb() { return lines.getAliasNb(); }
+    public String getPosition() {
+        String pos = '';
+        if (scenarioNb != null) pos = 'Scenario ' + String.valueOf(scenarioNb + 1) + ' ';
+        pos += 'Line ' + getLineNb();
+        if (lines.getAliasNb() != null) pos += ',Alias ' + String.valueOf(lines.getAliasNb() + 1) + ' Line ' + String.valueOf(lines.getAliasLineNb());
+        return pos;
+    }
     lineIterator lines;
  
     /////////////////////////////////////////////////   
     // RUN SCENARIO
     /////////////////////////////////////////////////   
+    List<Alias> aliases;
+
+    public Boolean runScenario(Integer nb) {
+        List<Scenario> scenarios = getScenarios();
+        if (nb < 1) throw new PickleException('Scenario number must be at least 1');
+        if (nb > scenarios.size()) throw new PickleException('Scenario ' + String.valueOf(nb) + ' not found - only ' + String.valueOf(scenarios.size()) + ' scenarios');
+        scenarioNb = nb - 1;
+        return runScenarioHelper(scenarios[nb - 1].label, scenarios[nb - 1].body);
+    }
+    
     public Boolean runScenario(String name, String scenario) {
+        scenarioNb = null;
+        return runScenarioHelper(name, scenario);
+    }
+        
+    public Boolean runScenarioHelper(String name, String scenario) {
         scenarioLabel = name;
-        lines = new lineIterator(scenario);
+        lines = new lineIterator(scenario, aliases);
         
         Boolean lineMatches;
         List<String> wordsToIgnore = new String[] { 'given', 'when', 'and', 'then' };
@@ -676,5 +745,73 @@ global abstract class Pickle {
             }
         }
         return true;
+    }
+
+    /////////////////////////////////////////////////   
+    // PICKLE SCENARIO REPOSITORY
+    /////////////////////////////////////////////////   
+    public class Scenario {
+        public String label { get; private set; }
+        public String body { get; private set; }
+        public String testClass { get; private set; }
+        public String htmlBody { get; private set; }
+        public String key { get; private set; }
+        public Boolean testCovered { get; private set; }
+        public Integer nb { get; set; }
+        
+        public void init() { htmlBody = body; }
+        public void isCoveredByTest(Boolean isCovered) {
+            testCovered = isCovered;
+            if (!testCovered) htmlBody = '<span style="color:lightgrey">' + body + '</span>';
+        }
+        public void testPasses() { htmlBody = '<span style="color:limegreen">' + body + '</span>'; }
+        public void displayError(Integer lineNbErr, String errMsg) {
+            if (body == null) return;
+            htmlBody = '';
+            Integer lineNb = 1;
+            for (String oldLine : body.split('\r\n')) {
+                if (lineNb < lineNbErr) htmlBody += '<span style="color:limegreen;">' + oldLine + '</span>\r\n';
+                else if (lineNb == lineNbErr) htmlBody += '<span style="color:red; font-weight:bold;">' + oldLine + ' [' + errMsg + ']</span>\r\n';
+                else htmlBody += '<span style="color:lightgrey;">' + oldLine + '</span>\r\n';
+                        
+                lineNb++;
+            }
+        }
+        
+        public Scenario(String l, String tc, String b) {
+            label = l;
+            body = b;
+            testClass = tc;
+            htmlBody = body;
+        }
+    }
+    
+    public class Alias {
+        public String pattern { get; private set; }
+        public String expandsTo { get; private set; }
+        public String expandsToHTML { get; private set; }
+        public Integer nb { get; set; }
+        public Boolean hasError { get; private set; }
+
+        public void init() { expandsToHTML = expandsTo; hasError = false; }
+        public void displayError(Integer lineNbErr, String errMsg) {
+            hasError = true;
+            Integer lineNb = 1;
+            expandsToHTML = '';
+            for (String oldLine : expandsTo.split('\r\n')) {
+                if (lineNb < lineNbErr) expandsToHTML += '<span style="color:limegreen;">' + oldLine + '</span>\r\n';
+                else if (lineNb == lineNbErr) expandsToHTML += '<span style="color:red; font-weight:bold;">' + oldLine + ' [' + errMsg + ']</span>\r\n';
+                else expandsToHTML += '<span style="color:lightgrey;">' + oldLine + '</span>\r\n';
+                
+                lineNb++;
+            }
+        }
+        
+        public Alias(String p, String e) {
+            pattern = p;
+            expandsTo = e;
+            expandsToHTML = e;
+            hasError = false;
+        }
     }
 }

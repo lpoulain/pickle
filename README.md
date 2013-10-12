@@ -45,8 +45,36 @@ When fed with the above scenario, Pickle does the following:
 
 Each scenario is composed of several steps (e.g. When I click on "Update"). You can also extend the language to add your own step definitions.
 
-Repository
+How to use Pickle
+-------
+Because Apex has limited self-reference, you will need to extend the Pickle.cls class to create your own binding. The Pickle project is composed of the following files:
+
+- Pickle.cls (required): this is the only required file to download
+- PickleScenarios.cls (optional): 
+- PickleAllScenarios.cls (optional): a class where you indicate where your custom Pickle
+- PickleScenarios.page (optional): a VisualForce page that displays your scenarios
+- CustomPickle.cls (example): an example of a custom Pickle class
+- PickleTest.cls (example): an example of a test class using Pickle
+
+The custom Pickle class can overload as needed some Pickle methods such as:
+- void initializeController(String pageName): manually initialize a VF controller
+- void setValue(String fieldName, String fieldValue): sets a given field to a given value
+- Object getValue(String fieldName): returns the value of a given field
+- void executeAction(String actionName): executes a given action
+- String getName(): returns the name of the component being tested
+- List<Scenario> getScenarios(): returns a list of scenarios
+- List<Alias> getAliases(): returns a list of aliases
+
+Once this is done, you can either run a scenario calling Pickle.runScenario([title], [scenario]) or define your scenarios by overloading Pickle.getScenarios() and call Pickle.runScenario([scenario nb])
+
+Scenario Repository
 ----
+If you have defined your scenarios by overloading Pickle.getScenarios(), you can use PickleScenarios to see on a VisualForce page what scenarios are available for a given component (see a component as a VisualForce page or a given Apex class you want to test), run tests from the interface and see on what line they fail. For this you need to:
+- Copy PickleAllScenarios.cls, PickleScenarios.cls and PickleScenarios.page to your org
+- Modify PickleAllScenarios.cls to implement method getPickle(). This method needs to return a list of strings containing the class names for each custom Pickle class you have created
+- Make sure each Pickle class mentioned overloads Pickle.getName() and Pickle.getScenarios()
+
+The repository will "check" that the test classes mentioned in Pickle.getScenarios() do contain a call to runScenario(Integer). The check is all but foolproof but its goal is to . If the Repository
 Pickle comes with an optional class PickleScenarios.cls (and its VisualForce page PickleScenarios.page). The purpose of the repository is to store all (or some of the) scenarios in one place, so end users can see them. The VF page displays the scenarios by component, and allows to run the tests.
 
 To add a scenario in the repository, modify PickleScenarios.createScenarios() by entering:
@@ -78,9 +106,3 @@ For randon testing, you need to define initializeController(), setValue() and ex
 In the above example, randomTesting() will run 1000 steps. Each step is either a executing an action or setting a field. In the latter case, Pickle will randomly choose among the list of available values, but will sometime choose to enter a random value (e.g. a string which is not in the provided list). After all, you should not trust client-side verification ;-)
 
 If the random test fails, you can trace back the steps Pickle followed by looking at the debug log.
-
-Future enhancements
------
-- A step definition type to verify the content of a list of SObject
-- Verification of the Apex Messages
-- Verification of the Apex Messages

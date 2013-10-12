@@ -60,6 +60,11 @@ This step calls Test.startTest()
 
 This step calls Test.stopTest()
 
+Defining Aliases
+-----
+
+If you don't want to repeat some steps, you can define some aliases by overloading Pickle.getAliases() (see CustomPickle.cls). An alias is just a collection of steps which is substituted when evaluating the scenario. Note that one cannot reference an alias inside an alias.
+
 Defining Custom Steps
 ----
 
