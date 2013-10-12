@@ -15,11 +15,18 @@
 
     function handleResult(result, event) {
         var elt = document.getElementById('status');
-        elt.innerHTML = result;
+        elt.innerHTML = result.replace('&lt;', '<').replace('&gt;', '>');
         if (result.indexOf('Completed') >= 0) {
             clearInterval(jobInterval);
             refresh();
         }
+        return false;
+    }
+    
+    function toggle(eltId) {
+        var elt = document.getElementById(eltId);
+        if (elt.style.display == 'none') elt.style.display = '';
+        else elt.style.display = 'none';
         return false;
     }
 </script>
@@ -34,31 +41,38 @@
     if ('{!testJobId}' != '') jobInterval = setInterval(getJobStatus, 1000);
 </script>
 
-    <apex:selectList value="{!component}" size="1">
+    <apex:selectList value="{!componentIdx}" size="1">
         <apex:selectOptions value="{!listComponents}"/>
     </apex:selectList>
 
     <apex:commandButton value="Refresh" action="{!refresh}"/>
 
     <div id="status"></div>
-{!debug}
 
 </apex:pageBlock>
 
-<apex:actionFunction name="refresh" action="{!checkTestStatus}" rerender="myBlock"/>
+<apex:actionFunction name="refresh" action="{!checkTestStatus}"/>
+
+<apex:pageBlock title="Aliases" id="aliasBlock">
+    <apex:repeat value="{!aliases}" var="a">
+        <b>{!a.nb + 1}) <a href="javaScript:toggle('alias{!a.nb}');">{!a.pattern}</a></b>
+        <div id="alias{!a.nb}" style="{!IF (a.hasError, '', 'display:none;')}"><pre><apex:outputText escape="false" value="{!a.expandsToHTML}"/></pre></div>
+    </apex:repeat>
+</apex:pageBlock>
 
 <apex:pageBlock id="hiddenBlock" rendered="false"></apex:pageBlock>
 
-<apex:repeat value="{!scenarios[component]}" var="testClass">
-    <apex:pageBlock title="{!testClass}.cls" id="myBlock">
+<apex:repeat value="{!testClasses}" var="testClass">
+    <apex:pageBlock title="{!testClass}.cls">
     
         <apex:pageBlockButtons >
-            <apex:commandButton value="Run the Test" action="{!runTest}" rerender="titleBlock, myBlock">
+            <apex:commandButton value="Run the Test" action="{!runTest}" rerender="titleBlock">
                 <apex:param name="className" value="{!testClass}" assignTo="{!className}" />
             </apex:commandButton>
         </apex:pageBlockButtons>
-        <apex:repeat value="{!scenarios[component][testClass]}" var="sc">
-            <b>{!sc.label}</b>
+        <div style="color:red;"><apex:outputText escape="false" value="{!testClass2error[testClass]}"/></div>
+        <apex:repeat value="{!scenariosByTestClass[testClass]}" var="sc">
+            <b>{!sc.nb + 1}) {!sc.label}</b>
             <pre>
                 <apex:outputText escape="false" value="{!sc.htmlBody}"/>
             </pre>
